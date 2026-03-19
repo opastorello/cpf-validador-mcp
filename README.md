@@ -19,6 +19,7 @@ O site do TRT3 ([certidao.trt3.jus.br](https://certidao.trt3.jus.br)) exige reso
 | `validate_cpf`              | Valida matematicamente um CPF pelo algoritmo módulo-11 dos dígitos verificadores                                                                               |
 | `generate_valid_variations` | Dado um CPF possivelmente errado, gera todas as variações matematicamente válidas: recalcula dígitos, troca 1 dígito (posições 0–8), transpõe pares adjacentes |
 | `check_feitos_trabalhistas` | Consulta a certidão de feitos trabalhistas no TRT3 — valida o CPF, resolve o CAPTCHA automaticamente e retorna o resultado estruturado                         |
+| `find_cpf_by_mask`          | Descobre o CPF completo a partir de uma máscara com `*` nos dígitos desconhecidos (ex: `***.123.456-**`) — gera todas as combinações válidas e consulta o TRT3 em paralelo, filtrando pelo nome na certidão |
 | `find_cpf_by_variations`    | Dado um CPF parcial ou com erros (10 ou 11 dígitos), gera todos os candidatos válidos e consulta o TRT3 **em paralelo** — se `nome` for informado, filtra pelo nome na certidão (útil para recuperar CPFs errados) |
 
 ---
@@ -30,6 +31,7 @@ O site do TRT3 ([certidao.trt3.jus.br](https://certidao.trt3.jus.br)) exige reso
 | `POST` | `/cpf/validate`              | Valida um CPF                                                             |
 | `POST` | `/cpf/variations`            | Gera variações válidas de um CPF                                          |
 | `POST` | `/trt3/feitos`               | Consulta feitos trabalhistas no TRT3                                      |
+| `POST` | `/trt3/buscar-por-mascara`   | Consulta todos os CPFs que encaixam em uma máscara com `*` em paralelo, filtra por nome |
 | `POST` | `/trt3/buscar-por-variacoes` | Consulta todas as variações de um CPF parcial em paralelo, filtra por nome |
 | `GET`  | `/health`                    | Health check                                                              |
 
@@ -44,14 +46,14 @@ FastAPI com FastMCP 3.0 montado em `/mcp` (streamable-http). A camada `services/
 ```
 app/
 ├── main.py             # FastAPI — inclui routers, monta mcp.http_app() em /mcp
-├── mcp_server.py       # FastMCP("cpf-validador") — 4 tools
+├── mcp_server.py       # FastMCP("cpf-validador") — 5 tools
 ├── auth.py             # TokenMiddleware — autenticação opcional via API_TOKEN
 ├── services/
-│   ├── cpf.py          # Validação e geração de variações (puro Python, sem deps)
+│   ├── cpf.py          # Validação, variações e geração por máscara (puro Python, sem deps)
 │   └── trt3.py         # Web scraping TRT3: curl_cffi + CAPTCHA solver + pypdf
 ├── routers/
 │   ├── cpf.py          # POST /cpf/validate, POST /cpf/variations
-│   └── trt3.py         # POST /trt3/feitos (async, offload para threadpool)
+│   └── trt3.py         # POST /trt3/feitos, /buscar-por-mascara, /buscar-por-variacoes
 └── captcha/
     ├── model.py        # Arquitetura CRNN (CNN + BiLSTM + CTC Loss)
     ├── predictor.py    # Inferência: carrega captcha_model.pt e prediz
@@ -114,6 +116,51 @@ curl -X POST http://localhost:8000/cpf/validate \
 ```bash
 docker run -p 8000:8000 -e API_TOKEN=meu-token-secreto cpf-validador-mcp
 ```
+
+---
+
+## Descobrir CPF a partir de uma máscara
+
+Quando você sabe apenas parte dos dígitos do CPF — por exemplo, apenas o miolo — use o endpoint `POST /trt3/buscar-por-mascara` (ou a tool MCP `find_cpf_by_mask`). Substitua os dígitos desconhecidos por `*`:
+
+```bash
+curl -X POST http://localhost:8000/trt3/buscar-por-mascara \
+  -H "Content-Type: application/json" \
+  -d '{"mascara": "***.123.456-**", "nome": "João Silva"}'
+```
+
+O servidor:
+1. Gera todas as combinações válidas para as posições com `*` (recalculando os dígitos verificadores)
+2. Consulta o TRT3 para cada candidato **em paralelo**
+3. Retorna apenas os que contêm o nome informado na certidão
+
+Resposta:
+```json
+{
+  "total": 1000,
+  "candidatos_gerados": 999,
+  "matches": {
+    "12312345600": {
+      "cpf": "123.123.456-00",
+      "encontrado": true,
+      "tipo_certidao": "NEGATIVA",
+      "tem_feitos": false,
+      "nome_certidao": "JOAO SILVA",
+      "valida_ate": "18/04/2026"
+    }
+  }
+}
+```
+
+**Parâmetros:**
+
+| Campo     | Tipo   | Descrição                                                                                  |
+| --------- | ------ | ------------------------------------------------------------------------------------------ |
+| `mascara` | string | CPF com `*` nos dígitos desconhecidos — deve ter 11 posições (dígitos + `*`)               |
+| `nome`    | string | Parte do nome para filtrar na certidão (case-insensitive, opcional)                        |
+| `workers` | int    | Threads paralelas para consultar o TRT3 (padrão: 8)                                       |
+
+> Os dígitos verificadores (posições 10–11) são sempre recalculados, independente do que for passado na máscara.
 
 ---
 
@@ -253,14 +300,14 @@ docker run -p 8000:8000 cpf-validador-mcp
 
 ## Configurar no Claude Desktop / Claude Code
 
-Adicione ao seu `claude_desktop_config.json` ou `~/.claude/settings.json`:
+Adicione ao seu `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
-    "trt3": {
-      "type": "http",
-      "url": "http://localhost:8000/mcp"
+    "cpf-validador": {
+      "command": "npx",
+      "args": ["mcp-remote", "http://localhost:8000/mcp", "--allow-http"]
     }
   }
 }
@@ -271,11 +318,11 @@ Com autenticação:
 ```json
 {
   "mcpServers": {
-    "trt3": {
-      "type": "http",
-      "url": "http://localhost:8000/mcp",
-      "headers": {
-        "Authorization": "Bearer meu-token-secreto"
+    "cpf-validador": {
+      "command": "npx",
+      "args": ["mcp-remote", "http://localhost:8000/mcp", "--allow-http"],
+      "env": {
+        "MCP_REMOTE_HEADER_AUTHORIZATION": "Bearer meu-token-secreto"
       }
     }
   }

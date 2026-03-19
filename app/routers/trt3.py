@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import re
 from starlette.concurrency import run_in_threadpool
-from app.services.cpf import is_valido
+from app.services.cpf import is_valido, gerar_cpfs_de_mascara
 from app.services.trt3 import consultar_trt3, consultar_trt3_multiplos
 
 
@@ -12,6 +12,12 @@ class CpfRequest(BaseModel):
 
 class BuscarVariacoesRequest(BaseModel):
     cpf_parcial: str
+    nome: str | None = None
+    workers: int = 8
+
+
+class BuscarMascaraRequest(BaseModel):
+    mascara: str
     nome: str | None = None
     workers: int = 8
 
@@ -79,6 +85,26 @@ async def buscar_por_variacoes(body: BuscarVariacoesRequest):
 
     resultado = await run_in_threadpool(
         consultar_trt3_multiplos, list(candidates), body.nome, body.workers
+    )
+    resultado["candidatos_gerados"] = len(candidates)
+    return resultado
+
+
+@router.post("/buscar-por-mascara")
+async def buscar_por_mascara(body: BuscarMascaraRequest):
+    """Consulta TRT3 para todos os CPFs que encaixam na máscara com * nos dígitos desconhecidos.
+    Ex: mascara='***.587.570-**', nome='Italvino Rebelatto'
+    Os dígitos verificadores são sempre recalculados automaticamente."""
+    try:
+        candidates = gerar_cpfs_de_mascara(body.mascara)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    if not candidates:
+        raise HTTPException(status_code=422, detail="Nenhum CPF válido gerado pela máscara")
+
+    resultado = await run_in_threadpool(
+        consultar_trt3_multiplos, candidates, body.nome, body.workers
     )
     resultado["candidatos_gerados"] = len(candidates)
     return resultado

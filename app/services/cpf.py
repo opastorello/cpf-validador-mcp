@@ -39,6 +39,41 @@ def validate_cpf(cpf: str) -> dict:
     }
 
 
+def gerar_cpfs_de_mascara(mascara: str) -> list[str]:
+    """Gera todos os CPFs válidos a partir de uma máscara com * nos dígitos desconhecidos.
+    Ex: '***.587.570-**' → lista com todos os CPFs válidos com miolo 587570.
+    Os dígitos verificadores (posições 10-11) são sempre recalculados.
+    """
+    # Extrai sequência de dígitos e wildcards (ignora pontos, traços, espaços)
+    chars = [c for c in mascara if c.isdigit() or c == "*"]
+    if len(chars) != 11:
+        raise ValueError(f"Máscara deve ter 11 posições (dígitos ou *), recebeu {len(chars)}: '{mascara}'")
+
+    # Posições 0-8 são a base; posições 9-10 são os verificadores (sempre recalculados)
+    base_template = chars[:9]
+
+    # Descobre quais posições da base são wildcards
+    wildcard_positions = [i for i, c in enumerate(base_template) if c == "*"]
+
+    candidates = []
+    for combo in _product("0123456789", repeat=len(wildcard_positions)):
+        base = list(base_template)
+        for pos, digit in zip(wildcard_positions, combo):
+            base[pos] = digit
+        base9 = "".join(base)
+        cpf11 = base9 + calcular_digitos(base9)
+        if is_valido(cpf11):
+            candidates.append(cpf11)
+
+    return candidates
+
+
+def _product(iterable, repeat=1):
+    """itertools.product reimplementado para evitar import extra."""
+    import itertools
+    return itertools.product(iterable, repeat=repeat)
+
+
 def generate_valid_variations(cpf: str) -> dict:
     numeros = re.sub(r"\D", "", cpf)
     if len(numeros) != 11:

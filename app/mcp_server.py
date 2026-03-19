@@ -1,7 +1,7 @@
 from fastmcp import FastMCP
 import re
 from starlette.concurrency import run_in_threadpool
-from app.services.cpf import validate_cpf as _validate_cpf, generate_valid_variations as _generate_valid_variations, is_valido, formatar
+from app.services.cpf import validate_cpf as _validate_cpf, generate_valid_variations as _generate_valid_variations, gerar_cpfs_de_mascara, is_valido, formatar
 from app.services.trt3 import consultar_trt3, consultar_trt3_multiplos
 
 mcp = FastMCP("cpf-validador")
@@ -30,6 +30,29 @@ async def check_feitos_trabalhistas(cpf: str) -> dict:
     if not is_valido(cpf_limpo):
         return {"erro": "CPF matematicamente inválido", "cpf": formatar(cpf_limpo)}
     return await run_in_threadpool(consultar_trt3, cpf_limpo)
+
+
+@mcp.tool
+async def find_cpf_by_mask(mascara: str, nome: str | None = None) -> dict:
+    """Descobre o CPF completo a partir de uma máscara com * nos dígitos desconhecidos.
+    Gera todas as combinações válidas e consulta o TRT3 em paralelo.
+    Se 'nome' for informado, filtra pelo nome na certidão.
+
+    Args:
+        mascara: CPF com * nos dígitos desconhecidos. Ex: '***.587.570-**', '382.***.570-**'
+        nome: nome ou parte do nome para filtrar (ex: 'Italvino Rebelatto')
+    """
+    try:
+        candidates = gerar_cpfs_de_mascara(mascara)
+    except ValueError as e:
+        return {"erro": str(e)}
+
+    if not candidates:
+        return {"erro": "Nenhum CPF válido gerado pela máscara", "mascara": mascara}
+
+    resultado = await run_in_threadpool(consultar_trt3_multiplos, candidates, nome, 8)
+    resultado["candidatos_gerados"] = len(candidates)
+    return resultado
 
 
 @mcp.tool
