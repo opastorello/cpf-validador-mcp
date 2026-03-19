@@ -1,0 +1,24 @@
+# Ambiente
+.env
+venv*/
+__pycache__/
+*.pyc
+*.pyo
+
+# Dados de treino (grandes demais para git)
+app/captcha/data/
+
+# Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code local
+.claude/
+*.bat
+

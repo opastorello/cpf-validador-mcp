@@ -1,0 +1,23 @@
+.env
+.env.*
+.git/
+.github/
+.vscode/
+.idea/
+.claude/
+
+venv*/
+__pycache__/
+*.pyc
+*.pyo
+
+# Dados de treino
+app/captcha/data/
+
+# Testes
+tests/
+
+# Docs e configs locais
+README.md
+CLAUDE.md
+*.bat
