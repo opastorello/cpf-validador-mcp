@@ -1,82 +1,101 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guia para o Claude Code ao trabalhar neste repositório.
 
-## Commands
+## Comandos
 
 ```bash
-# Install dependencies
+# Instalar dependências
 pip install -r requirements.txt
 
-# Run server locally (FastAPI + FastMCP on port 8000)
+# Rodar localmente (FastAPI + FastMCP na porta 8000)
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-# Docker
-docker build -t cpf-validador .
-docker run -p 8000:8000 cpf-validador
+# Docker (porta 8002 conforme docker-compose.yml)
+docker compose up --build -d
+docker compose down
 ```
 
-There are no automated tests. Manual testing via:
-- FastAPI docs: `http://localhost:8000/docs`
+Não há testes automatizados. Testes manuais via:
+- Interface web: `http://localhost:8000/`
+- FastAPI docs (apenas `ENV=development`): `http://localhost:8000/docs`
 - MCP transport: `http://localhost:8000/mcp` (streamable-http)
 
-## Architecture
+## Arquitetura
 
-FastAPI app (`app/main.py`) that includes REST routers **and** mounts a FastMCP 3.0 server at `/mcp`.
+FastAPI (`app/main.py`) com routers REST + FastMCP 3.0 montado em `/mcp`. A camada `services/` não tem dependência de framework.
 
 ```
 app/
-├── main.py           # FastAPI app — includes routers, mounts mcp.http_app() at /mcp
-├── mcp_server.py     # FastMCP("cpf-validador") — 4 tools wrapping services
-├── auth.py           # TokenMiddleware — optional auth via API_TOKEN env var
+├── main.py           # FastAPI — routers + rate limiter + mcp.http_app() em /mcp
+├── config.py         # Lê todas as variáveis de ambiente com defaults
+├── mcp_server.py     # FastMCP("cpf-validador") — 6 tools wrapping services
+├── auth.py           # TokenMiddleware — autenticação via API_TOKEN + controle prod/dev via ENV
 ├── services/
-│   ├── cpf.py        # Pure CPF logic (no framework deps)
-│   └── trt3.py       # TRT3 web scraping (curl_cffi + CRNN captcha + pypdf) + parallel lookup
+│   ├── cpf.py        # Lógica pura de CPF (zero deps de framework)
+│   └── trt3.py       # Web scraping TRT3: curl_cffi + CAPTCHA CRNN + pypdf + ThreadPoolExecutor
 ├── routers/
 │   ├── cpf.py        # POST /cpf/validate, POST /cpf/variations
-│   └── trt3.py       # POST /trt3/feitos, POST /trt3/buscar-por-variacoes
+│   ├── trt3.py       # POST /trt3/feitos, /feitos-multiplos, /buscar-por-mascara, /buscar-por-variacoes
+│   ├── history.py    # GET/POST/DELETE /history/ — histórico server-side em JSON
+│   └── ui.py         # GET / — interface web com gate de autenticação
 └── captcha/
-    ├── model.py       # CRNN architecture (CNN + BiLSTM + CTC Loss)
-    ├── predictor.py   # Inference — loads captcha_model.pt
-    ├── dataset.py     # CaptchaDataset with augmentation
-    ├── train.py       # Training loop with early stopping + AMP + registry
-    ├── collector.py   # Collects labeled samples from TRT3 (--workers N)
-    ├── registry.py    # Model versioning (models/vN/model.pt + meta.json)
-    └── models/        # Versioned model history
+    ├── model.py       # Arquitetura CRNN (CNN + BiLSTM + CTC Loss)
+    ├── predictor.py   # Inferência — carrega captcha_model.pt
+    ├── dataset.py     # CaptchaDataset com data augmentation
+    ├── train.py       # Loop de treino com early stopping + AMP + registry
+    ├── collector.py   # Coleta amostras rotuladas do TRT3 (--workers N)
+    ├── registry.py    # Versionamento de modelos (models/vN/model.pt + meta.json)
+    └── models/        # Histórico de versões treinadas
 ```
 
-### Layer rules
-- `services/` has **no FastAPI or FastMCP imports** — pure Python callable from anywhere
-- `routers/` and `mcp_server.py` both import from `services/` — same business logic, two interfaces
-- Blocking I/O in `services/trt3.py` is always wrapped with `run_in_threadpool` before awaiting
-- Parallel TRT3 queries use `ThreadPoolExecutor` inside `services/trt3.py` (not in routers)
+### Regras de camada
+- `services/` — zero imports de FastAPI ou FastMCP; puro Python
+- `routers/` e `mcp_server.py` importam apenas de `services/` — mesma lógica de negócio, duas interfaces
+- I/O bloqueante em `services/trt3.py` sempre executado via `run_in_threadpool`
+- Consultas paralelas usam `ThreadPoolExecutor` dentro de `services/trt3.py` (não nos routers)
 
-### MCP tools
-| Tool | Description |
-|------|-------------|
-| `validate_cpf` | Mathematical validation via modulo-11 check-digit algorithm |
-| `generate_valid_variations` | Returns all valid CPF variants: recalc digits, single-digit swap, adjacent transposition |
-| `check_feitos_trabalhistas` | Queries TRT3 labor court — validates CPF, solves CAPTCHA (CRNN), parses PDF result |
-| `find_cpf_by_variations` | Generates all valid candidates from a partial CPF and queries TRT3 in parallel — filters by name in the PDF certidão |
+### MCP tools (6)
+| Tool | Descrição |
+|------|-----------|
+| `validate_cpf` | Validação matemática via algoritmo módulo-11 |
+| `generate_valid_variations` | Gera variações válidas: recalcula dígitos, troca 1 dígito, transpõe pares adjacentes |
+| `check_feitos_trabalhistas` | Consulta TRT3 — valida CPF, resolve CAPTCHA (CRNN), retorna resultado estruturado |
+| `find_cpf_by_mask` | Descobre CPF completo a partir de máscara com `*` — consulta TRT3 em paralelo |
+| `find_cpf_by_variations` | Gera candidatos de CPF parcial/errado e consulta TRT3 em paralelo, filtra por nome |
+| `check_multiple_cpfs` | Consulta lista de CPFs em paralelo, agrupa erros de validação separadamente |
 
 ### REST endpoints
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/cpf/validate` | Validate a CPF |
-| POST | `/cpf/variations` | Generate valid variations |
-| POST | `/trt3/feitos` | Query TRT3 labor records for one CPF |
-| POST | `/trt3/buscar-por-variacoes` | Query all valid variants of a partial CPF in parallel, filter by name |
-| GET | `/health` | Health check |
+| Método | Rota | Rate limit | Descrição |
+|--------|------|------------|-----------|
+| GET | `/` | — | Interface web |
+| POST | `/cpf/validate` | — | Valida um CPF |
+| POST | `/cpf/variations` | — | Gera variações válidas |
+| POST | `/trt3/feitos` | 10/min por IP | Consulta feitos de um CPF |
+| POST | `/trt3/feitos-multiplos` | 5/min por IP | Consulta lista de CPFs em paralelo |
+| POST | `/trt3/buscar-por-mascara` | 3/min por IP | Consulta CPFs por máscara com `*` |
+| POST | `/trt3/buscar-por-variacoes` | 3/min por IP | Consulta variações de CPF parcial |
+| GET | `/history/` | — | Lista histórico de consultas |
+| POST | `/history/save` | — | Salva entrada no histórico |
+| DELETE | `/history/` | — | Limpa todo o histórico |
+| GET | `/health` | — | Health check (aberto em `development`) |
 
-### TRT3 scraping flow
-1. GET form page → extract JSF `ViewState` and CAPTCHA URL
-2. Download CAPTCHA image → solve with **CRNN local model** (PyTorch, ~98.5% accuracy); fallback to ddddocr
-3. POST form with Chrome-124 impersonation via **curl_cffi** (required to bypass TLS fingerprint)
-4. Retry up to 20× on CAPTCHA failure
-5. Parse response: if PDF returned, extract name/CPF/validity via **pypdf** regex
+### Autenticação
+- `API_TOKEN` vazio → servidor sem autenticação
+- `API_TOKEN` definido → todas as rotas exigem `Authorization: Bearer <token>`, exceto `/`
+- `ENV=development` → `/health`, `/docs`, `/redoc`, `/openapi.json` também ficam abertos
+- `ENV=production` → apenas `/` fica aberto sem token
+- Interface web (`/`) tem gate: exige token no browser quando `API_TOKEN` está configurado
 
-### CAPTCHA model
-- Architecture: CRNN (4× Conv2D + BatchNorm + BiLSTM × 2 + CTC Loss)
-- Training: 3 rounds bootstrapping, 55k samples total, val_accuracy 98.55%
-- Active model: `app/captcha/captcha_model.pt` (registry v1)
-- To retrain: `python -m app.captcha.train --epochs 120 --batch 128 --lr 1e-3`
+### Fluxo de scraping TRT3
+1. GET página do formulário → extrai JSF `ViewState` e URL do CAPTCHA
+2. Download da imagem CAPTCHA → resolve com **modelo CRNN local** (PyTorch, ~99% acurácia)
+3. POST do formulário com impersonação Chrome-124 via **curl_cffi** (bypass TLS fingerprint)
+4. Retry até 20× em falha de CAPTCHA
+5. Parse da resposta: se PDF retornado, extrai nome/CPF/validade via **pypdf** + regex
+
+### Modelo CAPTCHA
+- Arquitetura: CRNN (4× Conv2D + BatchNorm + BiLSTM × 2 + CTC Loss)
+- Treinamento: 3 rodadas bootstrapping, 55k amostras, val_accuracy 98.55%
+- Modelo ativo: `app/captcha/captcha_model.pt` (registry v1)
+- Para retreinar: `python -m app.captcha.train --epochs 120 --batch 128 --lr 1e-3`
