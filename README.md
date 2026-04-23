@@ -1,48 +1,56 @@
-# cpf-validador-mcp
+# 🔍 CPF Validador
 
-> MCP server para consulta de feitos trabalhistas no **TRT3 (3ª Região)** com resolução automática de CAPTCHA via rede neural treinada localmente — sem APIs externas, sem serviços pagos.
+> Valide CPFs, descubra a quem pertencem e encontre o CPF correto a partir de dígitos parciais ou ilegíveis — com resolução automática de CAPTCHA via rede neural treinada localmente.
 
-Expõe as mesmas operações como **MCP tools** (para agentes AI) e **REST API** (para integrações diretas), usando a mesma lógica de negócio internamente.
-
----
-
-## Por que este projeto existe
-
-O site do TRT3 ([certidao.trt3.jus.br](https://certidao.trt3.jus.br)) exige resolução de CAPTCHA para cada consulta. Este projeto resolve isso com uma CRNN (Convolutional Recurrent Neural Network) treinada especificamente nas imagens do site, atingindo **~99% de acurácia** sem depender de nenhum serviço externo.
+Expõe as mesmas operações como **MCP tools** (para agentes AI) e **REST API** (para integrações diretas), com interface web incluída.
 
 ---
 
-## MCP Tools
+## 💡 O que este projeto faz
 
-| Tool                        | Descrição |
-| --------------------------- | --------- |
-| `validate_cpf`              | Valida matematicamente um CPF pelo algoritmo módulo-11 |
-| `generate_valid_variations` | Gera todas as variações válidas de um CPF possivelmente errado: recalcula dígitos, troca 1 dígito, transpõe pares adjacentes |
-| `check_feitos_trabalhistas` | Consulta feitos trabalhistas no TRT3 — valida CPF, resolve CAPTCHA e retorna resultado estruturado |
-| `find_cpf_by_mask`          | Descobre o CPF completo a partir de uma máscara com `*` nos dígitos desconhecidos — consulta o TRT3 em paralelo filtrando pelo nome |
-| `find_cpf_by_variations`    | Dado um CPF parcial ou com erros (10 ou 11 dígitos), gera candidatos válidos e consulta o TRT3 em paralelo |
-| `check_multiple_cpfs`       | Consulta uma lista de CPFs em paralelo, agrupando erros de validação separadamente |
+| | |
+|--|--|
+| ✅ | Valida se um CPF é matematicamente correto |
+| 👤 | Confirma a quem um CPF pertence pelo nome |
+| 🔎 | Descobre o CPF completo a partir de dígitos parciais ou ilegíveis |
+| 👥 | Processa dezenas de CPFs em paralelo |
+| 🤖 | Integra com qualquer agente AI via protocolo MCP |
+
+Para confirmar a titularidade de um CPF, o sistema consulta o **TRT3** — que emite certidões públicas associando CPF e nome. A resolução de CAPTCHA é feita por uma **CRNN (Convolutional Recurrent Neural Network)** treinada especificamente para isso, atingindo **~99% de acurácia** sem depender de nenhum serviço externo.
 
 ---
 
-## REST API
+## 🤖 MCP Tools
 
-| Método | Rota                         | Rate limit     | Descrição |
-| ------ | ---------------------------- | -------------- | --------- |
-| `POST` | `/cpf/validate`              | —              | Valida um CPF |
-| `POST` | `/cpf/variations`            | —              | Gera variações válidas de um CPF |
-| `POST` | `/trt3/feitos`               | 10/min por IP  | Consulta feitos trabalhistas de um CPF |
-| `POST` | `/trt3/feitos-multiplos`     | 5/min por IP   | Consulta uma lista de CPFs em paralelo |
-| `POST` | `/trt3/buscar-por-mascara`   | 3/min por IP   | Consulta CPFs que encaixam em máscara com `*` |
-| `POST` | `/trt3/buscar-por-variacoes` | 3/min por IP   | Consulta variações de CPF parcial em paralelo |
-| `GET`  | `/health`                    | —              | Health check — retorna `{"status": "ok"}` |
-| `GET`  | `/`                          | —              | Interface web para consultas manuais |
+| Tool | Descrição |
+| ---- | --------- |
+| `validate_cpf` | Valida matematicamente um CPF pelo algoritmo módulo-11 |
+| `generate_valid_variations` | Gera todas as variações válidas de um CPF com dígitos errados ou ilegíveis |
+| `check_feitos_trabalhistas` | Confirma titularidade de um CPF consultando o TRT3 |
+| `find_cpf_by_mask` | Descobre o CPF completo a partir de uma máscara com `*` nos dígitos desconhecidos |
+| `find_cpf_by_variations` | Dado um CPF parcial ou errado, encontra o correto filtrando pelo nome |
+| `check_multiple_cpfs` | Valida e confirma titularidade de uma lista de CPFs em paralelo |
+
+---
+
+## 🌐 REST API
+
+| Método | Rota | Rate limit | Descrição |
+| ------ | ---- | ---------- | --------- |
+| `GET`  | `/` | — | Interface web |
+| `POST` | `/cpf/validate` | — | Valida um CPF matematicamente |
+| `POST` | `/cpf/variations` | — | Gera variações válidas de um CPF |
+| `POST` | `/trt3/feitos` | 10/min por IP | Confirma titularidade de um CPF via TRT3 |
+| `POST` | `/trt3/feitos-multiplos` | 5/min por IP | Confirma lista de CPFs em paralelo |
+| `POST` | `/trt3/buscar-por-mascara` | 3/min por IP | Descobre CPF por máscara com `*` |
+| `POST` | `/trt3/buscar-por-variacoes` | 3/min por IP | Descobre CPF correto a partir de variações |
+| `GET`  | `/health` | — | Health check — retorna `{"status": "ok"}` |
 
 Documentação interativa: `http://localhost:8000/docs` (disponível apenas em `ENV=development`).
 
 ---
 
-## Arquitetura
+## 🏗️ Arquitetura
 
 FastAPI com FastMCP 3.0 montado em `/mcp` (streamable-http). A camada `services/` não tem dependência de framework — a mesma lógica é consumida pelos routers REST e pelo MCP server.
 
@@ -54,7 +62,7 @@ app/
 ├── auth.py             # TokenMiddleware — autenticação via API_TOKEN + controle prod/dev
 ├── services/
 │   ├── cpf.py          # Validação, variações e geração por máscara (zero deps de framework)
-│   └── trt3.py         # Web scraping TRT3: curl_cffi + CAPTCHA solver + pypdf
+│   └── trt3.py         # Consulta TRT3: curl_cffi + CAPTCHA solver + pypdf
 ├── routers/
 │   ├── cpf.py          # POST /cpf/validate, POST /cpf/variations
 │   ├── trt3.py         # POST /trt3/feitos, /feitos-multiplos, /buscar-por-mascara, /buscar-por-variacoes
@@ -77,51 +85,51 @@ app/
 
 ---
 
-## Configuração
+## ⚙️ Configuração
 
 Todas as opções são lidas de variáveis de ambiente ou do arquivo `.env` na raiz do projeto.
 
 ### Referência completa de variáveis
 
-| Variável                  | Padrão                                            | Descrição |
-| ------------------------- | ------------------------------------------------- | --------- |
-| `API_TOKEN`               | *(vazio — sem auth)*                              | Token Bearer. Se vazio, todos os endpoints ficam abertos |
-| `ENV`                     | `development`                                     | `development` ou `production` — controla quais rotas ficam abertas sem token (ver abaixo) |
-| `TRT3_BASE_URL`           | `https://certidao.trt3.jus.br`                   | URL base do site do TRT3 |
-| `TRT3_FORM_PATH`          | `/certidao/feitosTrabalhistas/aba1.emissao.htm`  | Path do formulário de consulta |
-| `HTTP_TIMEOUT`            | `30`                                              | Timeout (segundos) para requisições HTTP ao TRT3 |
-| `CAPTCHA_TIMEOUT`         | `15`                                              | Timeout (segundos) para download da imagem CAPTCHA |
-| `MAX_CAPTCHA_ATTEMPTS`    | `20`                                              | Tentativas máximas de resolver o CAPTCHA antes de desistir |
-| `RETRY_DELAY`             | `1.0`                                             | Segundos de espera entre tentativas de CAPTCHA |
-| `DEFAULT_WORKERS`         | `8`                                               | Threads paralelas padrão nas consultas em lote |
-| `MAX_WORKERS`             | `20`                                              | Limite máximo de `workers` que o cliente pode solicitar |
-| `TASK_TIMEOUT`            | `60`                                              | Timeout (segundos) por CPF individual em consultas paralelas |
-| `MAX_WILDCARDS_IN_MASK`   | `5`                                               | Máximo de `*` na parte base da máscara (evita explosão combinatória) |
-| `RATE_LIMIT_FEITOS`       | `10/minute`                                       | Rate limit de `/trt3/feitos` por IP |
-| `RATE_LIMIT_MULTIPLOS`    | `5/minute`                                        | Rate limit de `/trt3/feitos-multiplos` por IP |
-| `RATE_LIMIT_MASK`         | `3/minute`                                        | Rate limit de `/trt3/buscar-por-mascara` por IP |
-| `RATE_LIMIT_VARIACOES`    | `3/minute`                                        | Rate limit de `/trt3/buscar-por-variacoes` por IP |
-| `CAPTCHA_MODEL_PATH`      | *(vazio — usa `app/captcha/captcha_model.pt`)*   | Path absoluto para o modelo `.pt` (útil para montar modelo externo) |
-| `HISTORY_RETENTION_DAYS`  | `90`                                              | Dias de retenção do histórico (LGPD). `0` = sem limite |
-| `APP_TIMEZONE`            | `America/Sao_Paulo`                               | Timezone para timestamps do histórico |
+| Variável | Padrão | Descrição |
+| -------- | ------ | --------- |
+| `API_TOKEN` | *(vazio — sem auth)* | Token Bearer. Se vazio, todos os endpoints ficam abertos |
+| `ENV` | `development` | `development` ou `production` — controla quais rotas ficam abertas sem token |
+| `TRT3_BASE_URL` | `https://certidao.trt3.jus.br` | URL base do site do TRT3 |
+| `TRT3_FORM_PATH` | `/certidao/feitosTrabalhistas/aba1.emissao.htm` | Path do formulário de consulta |
+| `HTTP_TIMEOUT` | `30` | Timeout (segundos) para requisições HTTP ao TRT3 |
+| `CAPTCHA_TIMEOUT` | `15` | Timeout (segundos) para download da imagem CAPTCHA |
+| `MAX_CAPTCHA_ATTEMPTS` | `20` | Tentativas máximas de resolver o CAPTCHA antes de desistir |
+| `RETRY_DELAY` | `1.0` | Segundos de espera entre tentativas de CAPTCHA |
+| `DEFAULT_WORKERS` | `8` | Threads paralelas padrão nas consultas em lote |
+| `MAX_WORKERS` | `20` | Limite máximo de `workers` que o cliente pode solicitar |
+| `TASK_TIMEOUT` | `60` | Timeout (segundos) por CPF individual em consultas paralelas |
+| `MAX_WILDCARDS_IN_MASK` | `5` | Máximo de `*` na parte base da máscara (evita explosão combinatória) |
+| `RATE_LIMIT_FEITOS` | `10/minute` | Rate limit de `/trt3/feitos` por IP |
+| `RATE_LIMIT_MULTIPLOS` | `5/minute` | Rate limit de `/trt3/feitos-multiplos` por IP |
+| `RATE_LIMIT_MASK` | `3/minute` | Rate limit de `/trt3/buscar-por-mascara` por IP |
+| `RATE_LIMIT_VARIACOES` | `3/minute` | Rate limit de `/trt3/buscar-por-variacoes` por IP |
+| `CAPTCHA_MODEL_PATH` | *(vazio — usa `app/captcha/captcha_model.pt`)* | Path absoluto para o modelo `.pt` (útil para montar modelo externo) |
+| `HISTORY_RETENTION_DAYS` | `90` | Dias de retenção do histórico (LGPD). `0` = sem limite |
+| `APP_TIMEZONE` | `America/Sao_Paulo` | Timezone para timestamps do histórico |
 
-### Rotas abertas por ambiente
+### 🔒 Rotas abertas por ambiente
 
-| Rota           | `development` | `production` |
-| -------------- | :-----------: | :----------: |
-| `/`            | ✅ aberta     | ✅ aberta    |
-| `/health`      | ✅ aberta     | 🔒 token     |
-| `/docs`        | ✅ aberta     | 🔒 token     |
-| `/redoc`       | ✅ aberta     | 🔒 token     |
-| `/openapi.json`| ✅ aberta     | 🔒 token     |
-| `/mcp`         | 🔒 token     | 🔒 token     |
-| demais         | 🔒 token     | 🔒 token     |
+| Rota | `development` | `production` |
+| ---- | :-----------: | :----------: |
+| `/` | ✅ aberta | ✅ aberta |
+| `/health` | ✅ aberta | 🔒 token |
+| `/docs` | ✅ aberta | 🔒 token |
+| `/redoc` | ✅ aberta | 🔒 token |
+| `/openapi.json` | ✅ aberta | 🔒 token |
+| `/mcp` | 🔒 token | 🔒 token |
+| demais | 🔒 token | 🔒 token |
 
 > Se `API_TOKEN` estiver vazio, o middleware ignora autenticação em qualquer ambiente.
 
 ---
 
-## Autenticação
+## 🔐 Autenticação
 
 Com `API_TOKEN` configurado, todas as requisições protegidas precisam enviar:
 
@@ -154,48 +162,51 @@ curl -X POST http://localhost:8000/trt3/feitos \
 }
 ```
 
+A interface web (`/`) exibe um **gate de autenticação** quando `API_TOKEN` está definido — o token é validado contra o servidor e salvo no navegador.
+
 ---
 
-## Instalação
+## 🚀 Instalação
 
 ### Pré-requisito: modelo de CAPTCHA
 
-O arquivo `app/captcha/captcha_model.pt` não está incluso no repositório. Baixe via [GitHub Releases](https://github.com/opastorello/cpf-validador-mcp/releases) e coloque em `app/captcha/captcha_model.pt` — ou treine do zero (ver [Treinar o modelo](#treinar-o-modelo)).
+O arquivo `app/captcha/captcha_model.pt` não está incluso no repositório. Baixe via [GitHub Releases](https://github.com/opastorello/cpf-validador/releases) e coloque em `app/captcha/captcha_model.pt` — ou treine do zero (ver [Treinar o modelo](#treinar-o-modelo)).
 
 ### Docker (recomendado)
 
 ```bash
-# Copie e ajuste o .env
-cp .env.example .env
-
-# Suba o container (porta 8002 → 8000 interno)
-docker compose up -d
-
-# Para produção
-ENV=production docker compose up -d
+git clone https://github.com/opastorello/cpf-validador.git
+cd cpf-validador
+cp .env.example .env   # edite se quiser definir API_TOKEN
+docker compose up --build -d
 ```
 
 ### Local
 
 ```bash
-git clone https://github.com/opastorello/cpf-validador-mcp
-cd cpf-validador-mcp
 pip install -r requirements.txt
-cp .env.example .env   # ajuste as variáveis
-
+cp .env.example .env
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Após iniciar:
-- Web UI: `http://localhost:8000/`
+- Interface web: `http://localhost:8000/`
 - REST docs: `http://localhost:8000/docs` *(apenas em `ENV=development`)*
 - MCP endpoint: `http://localhost:8000/mcp`
 
 ---
 
-## Exemplos de uso
+## 📋 Exemplos de uso
 
-### Consulta simples
+### Validar um CPF
+
+```bash
+curl -X POST http://localhost:8000/cpf/validate \
+  -H "Content-Type: application/json" \
+  -d '{"cpf": "529.982.247-25"}'
+```
+
+### Confirmar titularidade
 
 ```bash
 curl -X POST http://localhost:8000/trt3/feitos \
@@ -207,8 +218,6 @@ curl -X POST http://localhost:8000/trt3/feitos \
 {
   "cpf": "529.982.247-25",
   "encontrado": true,
-  "tipo_certidao": "NEGATIVA",
-  "tem_feitos": false,
   "nome_certidao": "JOAO DA SILVA",
   "valida_ate": "18/04/2026",
   "numero_certidao": "2026/123456"
@@ -225,7 +234,7 @@ curl -X POST http://localhost:8000/trt3/buscar-por-mascara \
   -d '{"mascara": "***.123.456-**", "nome": "João Silva"}'
 ```
 
-O servidor gera todas as combinações válidas para as posições com `*` (recalculando os dígitos verificadores), consulta o TRT3 em paralelo e retorna apenas os matches com o nome informado.
+O servidor gera todas as combinações válidas para as posições com `*`, consulta em paralelo e retorna apenas os matches com o nome informado.
 
 > Máximo de 5 wildcards na parte base (posições 0–8) = até 100.000 combinações. Configurável via `MAX_WILDCARDS_IN_MASK`.
 
@@ -237,8 +246,6 @@ curl -X POST http://localhost:8000/trt3/buscar-por-variacoes \
   -d '{"cpf_parcial": "5299824725", "nome": "joao"}'
 ```
 
-Gera todos os candidatos válidos e filtra pelo nome na certidão emitida pelo TRT3.
-
 ### Consulta em lote
 
 ```bash
@@ -249,19 +256,7 @@ curl -X POST http://localhost:8000/trt3/feitos-multiplos \
 
 ---
 
-## Fluxo de consulta TRT3
-
-```
-1. GET página           → extrai JSF ViewState + URL do CAPTCHA
-2. GET imagem CAPTCHA   → resolve com CRNN local (PyTorch, CPU)
-3. POST formulário      → impersonação Chrome-124 via curl_cffi (bypass TLS fingerprint)
-4. Retry até 20×        → CAPTCHA inválido: reutiliza sessão / sessão expirada: refaz GET
-5. Parse resultado      → PDF: extrai campos via pypdf + regex / HTML: parse direto
-```
-
----
-
-## Modelo de CAPTCHA
+## 🧠 Modelo de CAPTCHA
 
 ### Arquitetura CRNN
 
@@ -275,11 +270,11 @@ Output: string de 5 caracteres [0-9a-z]
 
 ### Bootstrapping em 3 rodadas
 
-| Rodada | Amostras | Rotulador              | Acurácia dos labels | Acurácia do modelo |
-| ------ | -------- | ---------------------- | :-----------------: | :----------------: |
-| 1      | 15.000   | ddddocr (OCR genérico) | ~43%                | **98.70%**         |
-| 2      | 20.000   | Modelo R1              | ~96%                | **98.80%**         |
-| 3      | 20.000   | Modelo R2              | ~99.3%              | **98.55%**         |
+| Rodada | Amostras | Rotulador | Acurácia dos labels | Acurácia do modelo |
+| ------ | -------- | --------- | :-----------------: | :----------------: |
+| 1 | 15.000 | ddddocr (OCR genérico) | ~43% | **98.70%** |
+| 2 | 20.000 | Modelo R1 | ~96% | **98.80%** |
+| 3 | 20.000 | Modelo R2 | ~99.3% | **98.55%** |
 
 **Total: 55.000 amostras.** O modelo final (v1) convergiu na época 106/120 com `val_loss=0.0072`.
 
@@ -292,7 +287,7 @@ Output: string de 5 caracteres [0-9a-z]
 
 ---
 
-## Treinar o modelo
+## 🏋️ Treinar o modelo
 
 **1. Coletar amostras**
 
@@ -324,16 +319,22 @@ python -m app.captcha.registry
 
 ---
 
-## Dependências principais
+## 📦 Dependências principais
 
 | Pacote | Uso |
 | ------ | --- |
 | [FastMCP](https://github.com/jlowin/fastmcp) | Framework MCP server |
-| [FastAPI](https://fastapi.tiangolo.com/) | REST API |
+| [FastAPI](https://github.com/fastapi/fastapi) | REST API |
 | [slowapi](https://github.com/laurentS/slowapi) | Rate limiting por IP |
 | [curl-cffi](https://github.com/yifeikong/curl-cffi) | HTTP com impersonação TLS Chrome-124 |
-| [PyTorch](https://pytorch.org/) | Rede neural CRNN para CAPTCHA |
-| [torchvision](https://pytorch.org/vision/) | Transforms e augmentation de imagem |
+| [PyTorch](https://github.com/pytorch/pytorch) | Rede neural CRNN para CAPTCHA |
+| [torchvision](https://github.com/pytorch/vision) | Transforms e augmentation de imagem |
 | [pypdf](https://github.com/py-pdf/pypdf) | Extração de dados do PDF de certidão |
-| [Pillow](https://python-pillow.org/) | Processamento de imagem |
+| [Pillow](https://github.com/python-pillow/Pillow) | Processamento de imagem |
 | [python-dotenv](https://github.com/theskumar/python-dotenv) | Carregamento de variáveis do `.env` |
+
+---
+
+## 📄 Licença
+
+MIT
