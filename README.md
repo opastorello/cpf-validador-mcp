@@ -44,6 +44,10 @@ Para confirmar a titularidade de um CPF, o sistema consulta o **TRT3** — que e
 | `POST` | `/trt3/feitos-multiplos` | 5/min por IP | Confirma lista de CPFs em paralelo |
 | `POST` | `/trt3/buscar-por-mascara` | 3/min por IP | Descobre CPF por máscara com `*` |
 | `POST` | `/trt3/buscar-por-variacoes` | 3/min por IP | Descobre CPF correto a partir de variações |
+| `GET`  | `/history/` | — | Lista o histórico de consultas realizadas |
+| `POST` | `/history/save` | — | Salva ou atualiza uma entrada no histórico |
+| `DELETE` | `/history/` | — | Limpa todo o histórico |
+| `DELETE` | `/history/{cpf}` | — | Remove a entrada de um CPF específico |
 | `GET`  | `/health` | — | Health check — retorna `{"status": "ok"}` |
 
 Documentação interativa: `http://localhost:8000/docs` (disponível apenas em `ENV=development`).

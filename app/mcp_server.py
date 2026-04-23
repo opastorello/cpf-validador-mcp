@@ -34,16 +34,16 @@ async def check_feitos_trabalhistas(cpf: str) -> dict:
 
 @mcp.tool
 async def find_cpf_by_mask(mascara: str, nome: str | None = None, workers: int = 8) -> dict:
-    workers = max(1, min(workers, 20))
     """Descobre o CPF completo a partir de uma máscara com * nos dígitos desconhecidos.
-    Gera todas as combinações válidas e consulta o TRT3 em paralelo.
-    Se 'nome' for informado, filtra pelo nome na certidão.
+    Gera todas as combinações matematicamente válidas e consulta o TRT3 em paralelo.
+    Se 'nome' for informado, filtra somente os resultados que contenham o nome na certidão.
 
     Args:
         mascara: CPF com * nos dígitos desconhecidos. Ex: '***.587.570-**', '382.***.570-**'
         nome: nome ou parte do nome para filtrar (ex: 'Italvino Rebelatto')
         workers: número de threads paralelas (padrão 8)
     """
+    workers = max(1, min(workers, 20))
     try:
         candidates = gerar_cpfs_de_mascara(mascara)
     except ValueError as e:
@@ -59,16 +59,16 @@ async def find_cpf_by_mask(mascara: str, nome: str | None = None, workers: int =
 
 @mcp.tool
 async def find_cpf_by_variations(cpf_parcial: str, nome: str | None = None, workers: int = 8) -> dict:
-    workers = max(1, min(workers, 20))
-    """Dado um CPF parcial ou com erros, gera todas as variações matematicamente válidas
-    e consulta o TRT3 em paralelo. Se 'nome' for informado, filtra os resultados pelo
-    nome na certidão — útil para identificar o CPF correto de uma pessoa.
+    """Dado um CPF parcial ou com erros, encontra o CPF correto filtrando pelo nome.
+    Gera todas as variações matematicamente válidas e consulta o TRT3 em paralelo.
+    Ideal para recuperar um CPF com um dígito faltando ou digitado errado.
 
     Args:
-        cpf_parcial: CPF com dígitos faltando ou errados (aceita 10 ou 11 dígitos)
+        cpf_parcial: CPF com dígitos faltando ou errados (9 a 11 dígitos)
         nome: nome ou parte do nome para filtrar (ex: 'nicolas', 'pastorello')
         workers: número de threads paralelas (padrão 8)
     """
+    workers = max(1, min(workers, 20))
     from app.services.cpf import generate_valid_variations
 
     cpf_limpo = re.sub(r"\D", "", cpf_parcial)
@@ -110,14 +110,14 @@ async def find_cpf_by_variations(cpf_parcial: str, nome: str | None = None, work
 
 @mcp.tool
 async def check_multiple_cpfs(cpfs: list[str], workers: int = 8) -> dict:
-    workers = max(1, min(workers, 20))
-    """Consulta feitos trabalhistas no TRT3 para uma lista de CPFs em paralelo.
-    Valida cada CPF antes de consultar e agrupa erros de validação separadamente.
+    """Valida e confirma titularidade de uma lista de CPFs em paralelo consultando o TRT3.
+    CPFs inválidos são agrupados no campo 'erros' sem interromper os demais.
 
     Args:
         cpfs: lista de CPFs (aceita com ou sem formatação)
         workers: número de threads paralelas (padrão 8)
     """
+    workers = max(1, min(workers, 20))
     cpfs_validos = []
     erros = {}
 

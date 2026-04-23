@@ -82,7 +82,13 @@ def _extrair_dados_pdf(pdf_bytes: bytes) -> dict:
     if validade_match:
         result["valida_ate"] = validade_match.group(1)
 
-    numero_match = re.search(r"N[úu]mero[:\s]+([\w\-\/\.]+)", text, re.IGNORECASE)
+    # TRT3 format: "Certidão n.\n<auth_code>\n<number>/<year>"
+    numero_match = re.search(
+        r"Certid[ãa]o\s+n[.º°]\s*[\r\n]+\S+[\r\n]+([\d]+\/[\d]{4})",
+        text, re.IGNORECASE,
+    )
+    if not numero_match:
+        numero_match = re.search(r"N[úu]mero[:\s]+([\w\-\/\.]+)", text, re.IGNORECASE)
     if numero_match:
         result["numero_certidao"] = numero_match.group(1).strip()
 
