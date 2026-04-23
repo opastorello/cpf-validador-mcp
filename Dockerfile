@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir torch torchvision --index-url https://download.py
 
 COPY app/ ./app/
 
-RUN useradd -m mcpuser
+RUN useradd -m mcpuser && mkdir -p /app/app/data && chown mcpuser /app/app/data
 USER mcpuser
 
 EXPOSE 8000

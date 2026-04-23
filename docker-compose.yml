@@ -1,0 +1,13 @@
+services:
+  cpf-validador:
+    build: .
+    ports:
+      - "8002:8000"
+    environment:
+      - API_TOKEN=${API_TOKEN:-}
+    volumes:
+      - cpf_data:/app/app/data
+    restart: always
+
+volumes:
+  cpf_data:

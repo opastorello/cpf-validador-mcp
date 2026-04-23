@@ -7,7 +7,7 @@ from starlette.responses import JSONResponse
 
 load_dotenv()
 
-_OPEN_PATHS = {"/health", "/docs", "/redoc", "/openapi.json"}
+_OPEN_PATHS = {"/health", "/docs", "/redoc", "/openapi.json", "/ui", "/history", "/history/"}
 
 _TOKEN = os.getenv("API_TOKEN", "").strip()
 

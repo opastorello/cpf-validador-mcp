@@ -117,13 +117,21 @@ def _consultar_trt3_interno(cpf_limpo: str, max_captcha_attempts: int = 20) -> d
     cpf_fmt = _formatar(cpf_limpo)
     session = _requests.Session(impersonate="chrome124")
 
+    def _init_session():
+        nonlocal session
+        session = _requests.Session(impersonate="chrome124")
+        return _fetch_page(session)
+
+    try:
+        action_url, viewstate, captcha_url = _fetch_page(session)
+    except Exception as e:
+        return {"cpf": cpf_fmt, "encontrado": None, "erro": f"Erro ao carregar página: {e}"}
+
+    if not captcha_url:
+        return {"cpf": cpf_fmt, "encontrado": None, "erro": "CAPTCHA URL não encontrada."}
+
     for attempt in range(max_captcha_attempts):
         try:
-            action_url, viewstate, captcha_url = _fetch_page(session)
-
-            if not captcha_url:
-                return {"cpf": cpf_fmt, "encontrado": None, "erro": "CAPTCHA URL não encontrada."}
-
             captcha_resp = session.get(captcha_url, headers=_HEADERS, timeout=15)
             captcha_resp.raise_for_status()
             captcha_text = _solve_captcha(captcha_resp.content).strip()
@@ -136,10 +144,24 @@ def _consultar_trt3_interno(cpf_limpo: str, max_captcha_attempts: int = 20) -> d
                 dados = _extrair_dados_pdf(resp.content)
                 return {"cpf": cpf_fmt, "encontrado": True, **dados}
 
-            # CAPTCHA inválido — nova sessão e tenta de novo no mesmo CPF
-            captcha_invalido = re.search(r"captcha inv[aá]lido|c[oó]digo incorreto|tente novamente|caracteres da imagem", resp.text, re.IGNORECASE)
+            # Sessão/ViewState expirado — refaz GET da página inteira
+            sessao_expirada = re.search(
+                r"sess[aã]o expirada|viewstate.*inv[aá]lid|expirou|sua sess[aã]o",
+                resp.text, re.IGNORECASE,
+            )
+            if sessao_expirada:
+                action_url, viewstate, captcha_url = _fetch_page(session)
+                if not captcha_url:
+                    return {"cpf": cpf_fmt, "encontrado": None, "erro": "CAPTCHA URL não encontrada após refetch."}
+                time.sleep(1)
+                continue
+
+            # CAPTCHA inválido — reutiliza sessão e viewstate, só refaz CAPTCHA
+            captcha_invalido = re.search(
+                r"captcha inv[aá]lido|c[oó]digo incorreto|tente novamente|caracteres da imagem",
+                resp.text, re.IGNORECASE,
+            )
             if captcha_invalido:
-                session = _requests.Session(impersonate="chrome124")
                 time.sleep(1)
                 continue
 
@@ -157,7 +179,13 @@ def _consultar_trt3_interno(cpf_limpo: str, max_captcha_attempts: int = 20) -> d
             return result
 
         except Exception:
-            session = _requests.Session(impersonate="chrome124")
+            # Erro de rede — recria sessão e refaz GET da página
+            try:
+                action_url, viewstate, captcha_url = _init_session()
+                if not captcha_url:
+                    return {"cpf": cpf_fmt, "encontrado": None, "erro": "CAPTCHA URL não encontrada após reconexão."}
+            except Exception:
+                pass
             time.sleep(1)
             continue
 

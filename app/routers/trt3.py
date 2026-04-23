@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import re
 from starlette.concurrency import run_in_threadpool
-from app.services.cpf import is_valido, gerar_cpfs_de_mascara
+from app.services.cpf import is_valido, formatar, gerar_cpfs_de_mascara
 from app.services.trt3 import consultar_trt3, consultar_trt3_multiplos
 
 
@@ -13,6 +13,11 @@ class CpfRequest(BaseModel):
 class BuscarVariacoesRequest(BaseModel):
     cpf_parcial: str
     nome: str | None = None
+    workers: int = 8
+
+
+class FeitosMultiplosRequest(BaseModel):
+    cpfs: list[str]
     workers: int = 8
 
 
@@ -44,19 +49,6 @@ async def buscar_por_variacoes(body: BuscarVariacoesRequest):
     if len(cpf_limpo) < 9:
         raise HTTPException(status_code=422, detail="CPF parcial deve ter ao menos 9 dígitos")
 
-    def _valid(d):
-        if len(d) != 11:
-            return False
-        s = sum(int(d[i]) * (10 - i) for i in range(9))
-        r = s % 11
-        d1 = 0 if r < 2 else 11 - r
-        if int(d[9]) != d1:
-            return False
-        s = sum(int(d[i]) * (11 - i) for i in range(10))
-        r = s % 11
-        d2 = 0 if r < 2 else 11 - r
-        return int(d[10]) == d2
-
     candidates = set()
     if len(cpf_limpo) == 11:
         from app.services.cpf import generate_valid_variations
@@ -67,7 +59,7 @@ async def buscar_por_variacoes(body: BuscarVariacoesRequest):
         for pos in range(11):
             for digit in "0123456789":
                 c = base[:pos] + digit + base[pos:]
-                if _valid(c):
+                if is_valido(c):
                     candidates.add(c)
         for wrong_pos in range(len(base)):
             for wrong_digit in "0123456789":
@@ -77,7 +69,7 @@ async def buscar_por_variacoes(body: BuscarVariacoesRequest):
                 for pos in range(11):
                     for digit in "0123456789":
                         c = modified[:pos] + digit + modified[pos:]
-                        if _valid(c):
+                        if is_valido(c):
                             candidates.add(c)
 
     if not candidates:
@@ -87,6 +79,30 @@ async def buscar_por_variacoes(body: BuscarVariacoesRequest):
         consultar_trt3_multiplos, list(candidates), body.nome, body.workers
     )
     resultado["candidatos_gerados"] = len(candidates)
+    return resultado
+
+
+@router.post("/feitos-multiplos")
+async def feitos_multiplos(body: FeitosMultiplosRequest):
+    """Consulta feitos trabalhistas no TRT3 para uma lista de CPFs em paralelo.
+    CPFs inválidos são rejeitados individualmente; os válidos são consultados em paralelo."""
+    cpfs_validos = []
+    erros = {}
+
+    for cpf in body.cpfs:
+        cpf_limpo = re.sub(r"\D", "", cpf)
+        if len(cpf_limpo) != 11:
+            erros[cpf] = {"erro": f"CPF deve ter 11 dígitos, recebido {len(cpf_limpo)}"}
+        elif not is_valido(cpf_limpo):
+            erros[cpf] = {"erro": "CPF matematicamente inválido", "cpf": formatar(cpf_limpo)}
+        else:
+            cpfs_validos.append(cpf_limpo)
+
+    if not cpfs_validos:
+        return {"total": len(body.cpfs), "erros": erros, "resultados": {}, "matches": {}}
+
+    resultado = await run_in_threadpool(consultar_trt3_multiplos, cpfs_validos, None, body.workers)
+    resultado["erros"] = erros
     return resultado
 
 
