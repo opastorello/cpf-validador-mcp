@@ -294,6 +294,24 @@ _HTML = r"""<!DOCTYPE html>
 
     .hist-clear:hover { color: var(--text); border-color: var(--muted); }
 
+    .hist-del {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 4px 7px;
+      margin: 0;
+      width: auto;
+      margin-top: 0;
+      border-radius: 5px;
+      flex-shrink: 0;
+      transition: color .15s, background .15s;
+    }
+
+    .hist-del:hover { color: var(--text); background: var(--surface2); }
+
     .hist-item {
       display: flex;
       align-items: center;
@@ -686,6 +704,11 @@ _HTML = r"""<!DOCTYPE html>
       renderHistory();
     }
 
+    async function deleteHistoryEntry(cpf) {
+      await fetch('/history/' + encodeURIComponent(cpf), { method: 'DELETE', headers: {...authH()} }).catch(() => {});
+      renderHistory();
+    }
+
     function fmtDt(iso) {
       if (!iso) return '—';
       const d = new Date(iso);
@@ -719,6 +742,8 @@ _HTML = r"""<!DOCTYPE html>
               <div class="hist-time">${fmtDt(h.ultima_consulta)}</div>
               <div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(h.consultas)}× consultado</div>
             </div>
+            <button class="hist-del" title="Remover entrada"
+              onclick="event.stopPropagation(); deleteHistoryEntry('${esc(h.cpf)}')">×</button>
           </div>`).join('');
       } catch {
         $histList.innerHTML = '<div class="hist-empty">Erro ao carregar histórico.</div>';
