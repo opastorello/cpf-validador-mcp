@@ -118,21 +118,13 @@ def _consultar_trt3_interno(cpf_limpo: str) -> dict:
     cpf_fmt = _formatar(cpf_limpo)
     session = _requests.Session(impersonate="chrome124")
 
-    def _init_session():
-        nonlocal session
-        session = _requests.Session(impersonate="chrome124")
-        return _fetch_page(session)
-
-    try:
-        action_url, viewstate, captcha_url = _fetch_page(session)
-    except Exception as e:
-        return {"cpf": cpf_fmt, "encontrado": None, "erro": f"Erro ao carregar página: {e}"}
-
-    if not captcha_url:
-        return {"cpf": cpf_fmt, "encontrado": None, "erro": "CAPTCHA URL não encontrada."}
-
     for attempt in range(_cfg.MAX_CAPTCHA_ATTEMPTS):
         try:
+            action_url, viewstate, captcha_url = _fetch_page(session)
+
+            if not captcha_url:
+                return {"cpf": cpf_fmt, "encontrado": None, "erro": "CAPTCHA URL não encontrada."}
+
             captcha_resp = session.get(captcha_url, headers=_HEADERS, timeout=_cfg.CAPTCHA_TIMEOUT)
             captcha_resp.raise_for_status()
             captcha_text = _solve_captcha(captcha_resp.content).strip()
@@ -145,22 +137,13 @@ def _consultar_trt3_interno(cpf_limpo: str) -> dict:
                 dados = _extrair_dados_pdf(resp.content)
                 return {"cpf": cpf_fmt, "encontrado": True, **dados}
 
-            sessao_expirada = re.search(
-                r"sess[aã]o expirada|viewstate.*inv[aá]lid|expirou|sua sess[aã]o",
-                resp.text, re.IGNORECASE,
-            )
-            if sessao_expirada:
-                action_url, viewstate, captcha_url = _fetch_page(session)
-                if not captcha_url:
-                    return {"cpf": cpf_fmt, "encontrado": None, "erro": "CAPTCHA URL não encontrada após refetch."}
-                time.sleep(_cfg.RETRY_DELAY)
-                continue
-
+            # CAPTCHA errado: TRT3 devolve o formulário — próxima iteração busca página fresca
             captcha_invalido = re.search(
-                r"captcha inv[aá]lido|c[oó]digo incorreto|tente novamente|caracteres da imagem",
+                r"captcha inv[aá]lido|c[oó]digo incorreto|tente novamente|caracteres da imagem|caracteres da figura",
                 resp.text, re.IGNORECASE,
-            )
+            ) or "form:verifyCaptcha_" in resp.text
             if captcha_invalido:
+                session = _requests.Session(impersonate="chrome124")
                 time.sleep(_cfg.RETRY_DELAY)
                 continue
 
@@ -178,12 +161,7 @@ def _consultar_trt3_interno(cpf_limpo: str) -> dict:
             return result
 
         except Exception:
-            try:
-                action_url, viewstate, captcha_url = _init_session()
-                if not captcha_url:
-                    return {"cpf": cpf_fmt, "encontrado": None, "erro": "CAPTCHA URL não encontrada após reconexão."}
-            except Exception:
-                pass
+            session = _requests.Session(impersonate="chrome124")
             time.sleep(_cfg.RETRY_DELAY)
             continue
 
