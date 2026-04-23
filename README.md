@@ -168,10 +168,6 @@ A interface web (`/`) exibe um **gate de autenticação** quando `API_TOKEN` est
 
 ## 🚀 Instalação
 
-### Pré-requisito: modelo de CAPTCHA
-
-O arquivo `app/captcha/captcha_model.pt` não está incluso no repositório. Baixe via [GitHub Releases](https://github.com/opastorello/cpf-validador/releases) e coloque em `app/captcha/captcha_model.pt` — ou treine do zero (ver [Treinar o modelo](#treinar-o-modelo)).
-
 ### Docker (recomendado)
 
 ```bash
@@ -282,12 +278,13 @@ Output: string de 5 caracteres [0-9a-z]
 
 - **Optimizer:** AdamW | **LR:** 1e-3 com CosineAnnealingLR
 - **Epochs:** 120 com early stopping (patience: 20)
-- **Batch size:** 128 | **AMP:** float16 via `torch.amp.autocast`
+- **Batch size:** 128 | **Treino:** GPU com AMP float16 via `torch.amp.autocast`
+- **Inferência:** CPU-only (Docker)
 - **Augmentation:** rotação, shear, translate, color jitter, gaussian blur, random erasing
 
 ---
 
-## 🏋️ Treinar o modelo
+## Treinar o modelo
 
 **1. Coletar amostras**
 
@@ -337,4 +334,4 @@ python -m app.captcha.registry
 
 ## 📄 Licença
 
-MIT
+[MIT](LICENSE) © 2026 Nícolas Pastorello
