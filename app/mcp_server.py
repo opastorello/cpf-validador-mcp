@@ -34,6 +34,7 @@ async def check_feitos_trabalhistas(cpf: str) -> dict:
 
 @mcp.tool
 async def find_cpf_by_mask(mascara: str, nome: str | None = None, workers: int = 8) -> dict:
+    workers = max(1, min(workers, 20))
     """Descobre o CPF completo a partir de uma máscara com * nos dígitos desconhecidos.
     Gera todas as combinações válidas e consulta o TRT3 em paralelo.
     Se 'nome' for informado, filtra pelo nome na certidão.
@@ -58,6 +59,7 @@ async def find_cpf_by_mask(mascara: str, nome: str | None = None, workers: int =
 
 @mcp.tool
 async def find_cpf_by_variations(cpf_parcial: str, nome: str | None = None, workers: int = 8) -> dict:
+    workers = max(1, min(workers, 20))
     """Dado um CPF parcial ou com erros, gera todas as variações matematicamente válidas
     e consulta o TRT3 em paralelo. Se 'nome' for informado, filtra os resultados pelo
     nome na certidão — útil para identificar o CPF correto de uma pessoa.
@@ -108,6 +110,7 @@ async def find_cpf_by_variations(cpf_parcial: str, nome: str | None = None, work
 
 @mcp.tool
 async def check_multiple_cpfs(cpfs: list[str], workers: int = 8) -> dict:
+    workers = max(1, min(workers, 20))
     """Consulta feitos trabalhistas no TRT3 para uma lista de CPFs em paralelo.
     Valida cada CPF antes de consultar e agrupa erros de validação separadamente.
 

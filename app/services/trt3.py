@@ -4,9 +4,10 @@ import time
 from pypdf import PdfReader
 from curl_cffi import requests as _requests
 from app.captcha.predictor import predict as _solve_captcha
+from app import config as _cfg
 
-_TRT3_BASE = "https://certidao.trt3.jus.br"
-_TRT3_URL = f"{_TRT3_BASE}/certidao/feitosTrabalhistas/aba1.emissao.htm"
+_TRT3_BASE = _cfg.TRT3_BASE_URL
+_TRT3_URL = f"{_TRT3_BASE}{_cfg.TRT3_FORM_PATH}"
 
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -16,13 +17,13 @@ _HEADERS = {
     "Connection": "keep-alive",
 }
 
+
 def _formatar(cpf: str) -> str:
     return f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
 
 
-
 def _fetch_page(session) -> tuple[str, str, str]:
-    resp = session.get(_TRT3_URL, headers=_HEADERS, timeout=30)
+    resp = session.get(_TRT3_URL, headers=_HEADERS, timeout=_cfg.HTTP_TIMEOUT)
     resp.raise_for_status()
     html = resp.text
 
@@ -54,7 +55,7 @@ def _post_form(session, action_url, viewstate, cpf_fmt, captcha_text):
         "javax.faces.ViewState": viewstate,
     }
     headers = {**_HEADERS, "Content-Type": "application/x-www-form-urlencoded", "Referer": _TRT3_URL}
-    return session.post(action_url, data=data, headers=headers, timeout=30)
+    return session.post(action_url, data=data, headers=headers, timeout=_cfg.HTTP_TIMEOUT)
 
 
 def _extrair_dados_pdf(pdf_bytes: bytes) -> dict:
@@ -113,7 +114,7 @@ def _parse_html_resultado(cpf_limpo, cpf_fmt, resp) -> dict:
     return {"cpf": cpf_fmt, "encontrado": None, "mensagem": "Resultado indeterminado."}
 
 
-def _consultar_trt3_interno(cpf_limpo: str, max_captcha_attempts: int = 20) -> dict:
+def _consultar_trt3_interno(cpf_limpo: str) -> dict:
     cpf_fmt = _formatar(cpf_limpo)
     session = _requests.Session(impersonate="chrome124")
 
@@ -130,9 +131,9 @@ def _consultar_trt3_interno(cpf_limpo: str, max_captcha_attempts: int = 20) -> d
     if not captcha_url:
         return {"cpf": cpf_fmt, "encontrado": None, "erro": "CAPTCHA URL não encontrada."}
 
-    for attempt in range(max_captcha_attempts):
+    for attempt in range(_cfg.MAX_CAPTCHA_ATTEMPTS):
         try:
-            captcha_resp = session.get(captcha_url, headers=_HEADERS, timeout=15)
+            captcha_resp = session.get(captcha_url, headers=_HEADERS, timeout=_cfg.CAPTCHA_TIMEOUT)
             captcha_resp.raise_for_status()
             captcha_text = _solve_captcha(captcha_resp.content).strip()
 
@@ -144,7 +145,6 @@ def _consultar_trt3_interno(cpf_limpo: str, max_captcha_attempts: int = 20) -> d
                 dados = _extrair_dados_pdf(resp.content)
                 return {"cpf": cpf_fmt, "encontrado": True, **dados}
 
-            # Sessão/ViewState expirado — refaz GET da página inteira
             sessao_expirada = re.search(
                 r"sess[aã]o expirada|viewstate.*inv[aá]lid|expirou|sua sess[aã]o",
                 resp.text, re.IGNORECASE,
@@ -153,23 +153,22 @@ def _consultar_trt3_interno(cpf_limpo: str, max_captcha_attempts: int = 20) -> d
                 action_url, viewstate, captcha_url = _fetch_page(session)
                 if not captcha_url:
                     return {"cpf": cpf_fmt, "encontrado": None, "erro": "CAPTCHA URL não encontrada após refetch."}
-                time.sleep(1)
+                time.sleep(_cfg.RETRY_DELAY)
                 continue
 
-            # CAPTCHA inválido — reutiliza sessão e viewstate, só refaz CAPTCHA
             captcha_invalido = re.search(
                 r"captcha inv[aá]lido|c[oó]digo incorreto|tente novamente|caracteres da imagem",
                 resp.text, re.IGNORECASE,
             )
             if captcha_invalido:
-                time.sleep(1)
+                time.sleep(_cfg.RETRY_DELAY)
                 continue
 
             result = _parse_html_resultado(cpf_limpo, cpf_fmt, resp)
 
             if result.get("pdf_url"):
                 try:
-                    pdf_resp = session.get(result["pdf_url"], headers=_HEADERS, timeout=30)
+                    pdf_resp = session.get(result["pdf_url"], headers=_HEADERS, timeout=_cfg.HTTP_TIMEOUT)
                     pdf_resp.raise_for_status()
                     pdf_data = _extrair_dados_pdf(pdf_resp.content)
                     result.update(pdf_data)
@@ -179,48 +178,36 @@ def _consultar_trt3_interno(cpf_limpo: str, max_captcha_attempts: int = 20) -> d
             return result
 
         except Exception:
-            # Erro de rede — recria sessão e refaz GET da página
             try:
                 action_url, viewstate, captcha_url = _init_session()
                 if not captcha_url:
                     return {"cpf": cpf_fmt, "encontrado": None, "erro": "CAPTCHA URL não encontrada após reconexão."}
             except Exception:
                 pass
-            time.sleep(1)
+            time.sleep(_cfg.RETRY_DELAY)
             continue
 
-    return {"cpf": cpf_fmt, "encontrado": None, "erro": f"CAPTCHA não resolvido após {max_captcha_attempts} tentativas."}
+    return {"cpf": cpf_fmt, "encontrado": None, "erro": f"CAPTCHA não resolvido após {_cfg.MAX_CAPTCHA_ATTEMPTS} tentativas."}
 
 
 def consultar_trt3(cpf_limpo: str) -> dict:
-    """Consulta feitos trabalhistas no TRT3 para um CPF limpo (11 dígitos).
-    Returns dict with: cpf, encontrado (bool/None), and optional fields:
-    tipo_certidao, nome_certidao, cpf_certidao, valida_ate, numero_certidao,
-    pdf_url, mensagem, erro
-    """
     return _consultar_trt3_interno(cpf_limpo)
 
 
-def consultar_trt3_multiplos(cpfs: list[str], nome_filtro: str | None = None, workers: int = 8) -> dict:
-    """Consulta múltiplos CPFs em paralelo via ThreadPoolExecutor.
+def consultar_trt3_multiplos(cpfs: list[str], nome_filtro: str | None = None, workers: int | None = None) -> dict:
+    from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeout
 
-    Args:
-        cpfs: lista de CPFs limpos (11 dígitos)
-        nome_filtro: se informado, filtra resultados cujo nome_certidao contenha este texto (case-insensitive)
-        workers: número de threads paralelas (padrão 8)
-
-    Returns:
-        dict com 'resultados' (todos) e 'matches' (apenas os que passaram no filtro de nome)
-    """
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+    n_workers = max(1, min(workers if workers is not None else _cfg.DEFAULT_WORKERS, _cfg.MAX_WORKERS))
 
     resultados = {}
-    with ThreadPoolExecutor(max_workers=workers) as executor:
+    with ThreadPoolExecutor(max_workers=n_workers) as executor:
         futures = {executor.submit(_consultar_trt3_interno, cpf): cpf for cpf in cpfs}
         for future in as_completed(futures):
             cpf = futures[future]
             try:
-                resultados[cpf] = future.result()
+                resultados[cpf] = future.result(timeout=_cfg.TASK_TIMEOUT)
+            except FutureTimeout:
+                resultados[cpf] = {"cpf": _formatar(cpf), "encontrado": None, "erro": f"Timeout após {_cfg.TASK_TIMEOUT}s"}
             except Exception as e:
                 resultados[cpf] = {"cpf": _formatar(cpf), "encontrado": None, "erro": str(e)}
 

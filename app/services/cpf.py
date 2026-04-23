@@ -55,6 +55,14 @@ def gerar_cpfs_de_mascara(mascara: str) -> list[str]:
     # Descobre quais posições da base são wildcards
     wildcard_positions = [i for i, c in enumerate(base_template) if c == "*"]
 
+    from app import config as _cfg
+    if len(wildcard_positions) > _cfg.MAX_WILDCARDS_IN_MASK:
+        limit = 10 ** _cfg.MAX_WILDCARDS_IN_MASK
+        raise ValueError(
+            f"Máscara tem {len(wildcard_positions)} wildcards na base; "
+            f"máximo permitido é {_cfg.MAX_WILDCARDS_IN_MASK} (~{limit:,} combinações)"
+        )
+
     candidates = []
     for combo in _product("0123456789", repeat=len(wildcard_positions)):
         base = list(base_template)

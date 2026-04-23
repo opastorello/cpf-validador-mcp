@@ -1,15 +1,20 @@
 import json
 import os
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+
 from fastapi import APIRouter
 from pydantic import BaseModel
+
+from app import config as _cfg
 
 router = APIRouter(prefix="/history", tags=["history"])
 
 _FILE = os.path.join(os.path.dirname(__file__), "..", "data", "history.json")
 _lock = threading.Lock()
+_RETENTION_DAYS = _cfg.HISTORY_RETENTION_DAYS
+_TZ = ZoneInfo(_cfg.APP_TIMEZONE)
 
 
 def _load() -> dict:
@@ -26,6 +31,13 @@ def _persist(data: dict):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+def _purge_old(data: dict) -> dict:
+    if _RETENTION_DAYS <= 0:
+        return data
+    cutoff = (datetime.now(_TZ) - timedelta(days=_RETENTION_DAYS)).isoformat()
+    return {k: v for k, v in data.items() if v.get("ultima_consulta", "") >= cutoff}
+
+
 class SaveRequest(BaseModel):
     cpf: str
     nome: str | None = None
@@ -36,9 +48,9 @@ class SaveRequest(BaseModel):
 @router.post("/save")
 def save(entry: SaveRequest):
     key = entry.cpf.replace(".", "").replace("-", "")
-    now = datetime.now(ZoneInfo("America/Sao_Paulo")).isoformat()
+    now = datetime.now(_TZ).isoformat()
     with _lock:
-        data = _load()
+        data = _purge_old(_load())
         if key in data:
             data[key]["consultas"] += 1
             data[key]["ultima_consulta"] = now
@@ -65,7 +77,7 @@ def save(entry: SaveRequest):
 @router.get("/")
 def get_all():
     with _lock:
-        data = _load()
+        data = _purge_old(_load())
     entries = sorted(data.values(), key=lambda x: x.get("ultima_consulta", ""), reverse=True)
     return {"entries": entries, "total": len(entries)}
 

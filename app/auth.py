@@ -1,3 +1,4 @@
+import hmac
 import os
 
 from dotenv import load_dotenv
@@ -7,9 +8,15 @@ from starlette.responses import JSONResponse
 
 load_dotenv()
 
-_OPEN_PATHS = {"/health", "/docs", "/redoc", "/openapi.json", "/ui", "/history", "/history/"}
-
 _TOKEN = os.getenv("API_TOKEN", "").strip()
+_ENV = os.getenv("ENV", "development").strip().lower()
+
+# Em produção, apenas "/" é acessível sem token via web
+# Em desenvolvimento, /docs, /redoc, /openapi.json e /health também ficam abertos
+_OPEN_PATHS_ALWAYS = {"/"}
+_OPEN_PATHS_DEV = {"/health", "/docs", "/redoc", "/openapi.json"}
+
+_OPEN_PATHS = _OPEN_PATHS_ALWAYS | (_OPEN_PATHS_DEV if _ENV == "development" else set())
 
 
 class TokenMiddleware(BaseHTTPMiddleware):
@@ -21,7 +28,10 @@ class TokenMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         auth = request.headers.get("Authorization", "")
-        if not auth.startswith("Bearer ") or auth[7:] != _TOKEN:
+        if not auth.startswith("Bearer "):
+            return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+
+        if not hmac.compare_digest(auth[7:], _TOKEN):
             return JSONResponse({"detail": "Unauthorized"}, status_code=401)
 
         return await call_next(request)

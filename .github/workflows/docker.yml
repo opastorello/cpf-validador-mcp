@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE: ghcr.io/opastorello/cpf-validador-mcp
+  IMAGE: ghcr.io/opastorello/cpf-validador
 
 jobs:
   build:

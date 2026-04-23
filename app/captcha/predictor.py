@@ -5,8 +5,10 @@ import torchvision.transforms as T
 import io
 
 from app.captcha.model import CaptchaModel, decode_greedy, IMG_H, IMG_W
+from app import config as _cfg
 
-MODEL_PATH = Path(__file__).parent / "captcha_model.pt"
+_custom = _cfg.CAPTCHA_MODEL_PATH
+MODEL_PATH = Path(_custom) if _custom else Path(__file__).parent / "captcha_model.pt"
 
 _model: CaptchaModel | None = None
 

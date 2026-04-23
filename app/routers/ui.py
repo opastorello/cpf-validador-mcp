@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
+from app.auth import _TOKEN
 
 router = APIRouter(include_in_schema=False)
 
@@ -23,10 +24,10 @@ _HTML = r"""<!DOCTYPE html>
       --muted: #7d8590;
       --accent: #1f6feb;
       --accent-h: #388bfd;
-      --ok-bg: rgba(46,160,67,.12);
-      --ok-text: #3fb950;
-      --err-bg: rgba(218,54,51,.10);
-      --err-text: #f85149;
+      --ok-bg: rgba(255,255,255,.05);
+      --ok-text: #7d8590;
+      --err-bg: rgba(255,255,255,.04);
+      --err-text: #7d8590;
       --r: 10px;
     }
 
@@ -48,9 +49,17 @@ _HTML = r"""<!DOCTYPE html>
       font-weight: 700;
       letter-spacing: -.3px;
       margin-bottom: 6px;
+      text-align: center;
     }
 
     .sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; text-align: center; }
+
+    #main-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
 
     .wrap { width: 100%; max-width: 460px; }
 
@@ -208,13 +217,13 @@ _HTML = r"""<!DOCTYPE html>
       animation: rot .6s linear infinite;
     }
 
-    .step.done .si { color: var(--ok-text); }
+    .step.done .si { color: var(--muted); }
     .step.done .si::after { content: '✓'; font-size: 14px; }
     .step.done > span:last-child { color: var(--muted); }
 
-    .step.fail .si { color: var(--err-text); }
+    .step.fail .si { color: var(--muted); }
     .step.fail .si::after { content: '✕'; font-size: 14px; }
-    .step.fail > span:last-child { color: var(--err-text); }
+    .step.fail > span:last-child { color: var(--muted); }
 
     @keyframes rot { to { transform: rotate(360deg); } }
 
@@ -283,7 +292,7 @@ _HTML = r"""<!DOCTYPE html>
       transition: color .15s, border-color .15s;
     }
 
-    .hist-clear:hover { color: var(--err-text); border-color: var(--err-text); }
+    .hist-clear:hover { color: var(--text); border-color: var(--muted); }
 
     .hist-item {
       display: flex;
@@ -321,12 +330,12 @@ _HTML = r"""<!DOCTYPE html>
     }
 
     .err-box {
-      background: var(--err-bg);
-      border: 1px solid rgba(218,54,51,.25);
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: var(--r);
       padding: 14px 18px;
       font-size: 14px;
-      color: var(--err-text);
+      color: var(--muted);
       margin-top: 14px;
     }
 
@@ -342,6 +351,23 @@ _HTML = r"""<!DOCTYPE html>
 </head>
 <body>
 
+  <!-- gate: shown only when AUTH_REQUIRED and no token stored -->
+  <div id="gate" style="display:none;width:100%;max-width:400px;text-align:center">
+    <div class="logo">🔒</div>
+    <h1>Acesso restrito</h1>
+    <p class="sub">Informe o API Token para continuar</p>
+    <div class="card" style="margin-top:20px">
+      <div class="field">
+        <label>API Token</label>
+        <input id="gate-token" type="password" placeholder="Token de acesso" autocomplete="off" />
+      </div>
+      <button id="btn-gate" onclick="gateLogin()" style="margin-top:14px">Entrar</button>
+      <div id="gate-msg" style="display:none;margin-top:10px;font-size:13px"></div>
+    </div>
+  </div>
+
+  <!-- main: hidden until authenticated -->
+  <div id="main-content">
   <div class="logo">🔍</div>
   <h1>CPF Validador</h1>
   <p class="sub">Verifique se um CPF é válido e a quem pertence</p>
@@ -390,8 +416,12 @@ _HTML = r"""<!DOCTYPE html>
       </div>
     </div>
   </div>
+  </div><!-- /main-content -->
 
   <script>
+    const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    const safeUrl = u => (u && /^https?:\/\//i.test(u)) ? u : '#';
+
     const $cpf    = document.getElementById('cpf');
     const $nome   = document.getElementById('nome');
     const $btn    = document.getElementById('btn');
@@ -441,7 +471,10 @@ _HTML = r"""<!DOCTYPE html>
     function failStep(el, txt) { el.className='step show fail'; if(txt) el.querySelector('span:last-child').textContent=txt; }
 
     const delay = ms => new Promise(r => setTimeout(r, ms));
-    const post  = (path, body) => fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    const AUTH_REQUIRED = __AUTH_REQUIRED__;
+    const getToken = () => localStorage.getItem('api_token') || '';
+    const authH = () => { const t = getToken(); return t ? {'Authorization': 'Bearer ' + t} : {}; };
+    const post  = (path, body) => fetch(path, { method:'POST', headers:{'Content-Type':'application/json', ...authH()}, body:JSON.stringify(body) });
 
     /* ── main ── */
     async function verificar() {
@@ -514,7 +547,7 @@ _HTML = r"""<!DOCTYPE html>
         stopTimer();
 
         if (!resultados.length) {
-          $out.innerHTML = `<div class="err-box">⚠️ Nenhum resultado encontrado${nome ? ` para "${nome}"` : ''}${hasMask ? ` — ${totalCandidatos} candidatos testados` : ''}.</div>`;
+          $out.innerHTML = `<div class="err-box">⚠️ Nenhum resultado encontrado${nome ? ` para "${esc(nome)}"` : ''}${hasMask ? ` — ${esc(String(totalCandidatos))} candidatos testados` : ''}.</div>`;
           return;
         }
 
@@ -524,24 +557,24 @@ _HTML = r"""<!DOCTYPE html>
           const bate     = nome ? nomeMatch(nomeReal, nome) : null;
 
           const indicator = bate === true
-            ? `<span style="color:var(--ok-text);font-weight:600;font-size:13px">✓ Confirmado</span>`
+            ? `<span style="color:var(--muted);font-weight:500;font-size:13px">✓ Confirmado</span>`
             : bate === false
-            ? `<span style="color:var(--err-text);font-weight:600;font-size:13px">✕ Nome não bate</span>`
+            ? `<span style="color:var(--muted);font-weight:500;font-size:13px">✕ Nome não bate</span>`
             : '';
 
           const pdfLink = d.pdf_url
-            ? `<a href="${d.pdf_url}" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:500">↗ Abrir PDF</a>`
+            ? `<a href="${safeUrl(d.pdf_url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none;font-weight:500">↗ Abrir PDF</a>`
             : '—';
 
           return `
           <div class="result-card">
             <div class="result-head">
-              <span class="result-name">${nomeReal}</span>
+              <span class="result-name">${esc(nomeReal)}</span>
               ${indicator}
             </div>
             <div class="result-body">
-              ${row('CPF', cpfFmt)}
-              ${d.numero_certidao ? row('Nº da certidão', d.numero_certidao) : ''}
+              ${row('CPF', esc(cpfFmt))}
+              ${d.numero_certidao ? row('Nº da certidão', esc(d.numero_certidao)) : ''}
               ${d.pdf_url         ? row('Certidão PDF', pdfLink) : ''}
             </div>
           </div>`;
@@ -558,20 +591,66 @@ _HTML = r"""<!DOCTYPE html>
 
       } catch(e) {
         stopTimer();
-        $out.innerHTML = `<div class="err-box">⚠️ ${e.message}</div>`;
+        $out.innerHTML = `<div class="err-box">⚠️ ${esc(e.message)}</div>`;
       } finally {
         $btn.disabled = false;
         $btn.textContent = 'Verificar';
       }
     }
 
+    /* ── gate ── */
+    function updateTabLock() {
+      const locked = AUTH_REQUIRED && !getToken();
+      document.getElementById('gate').style.display         = locked ? 'block' : 'none';
+      document.getElementById('main-content').style.display = locked ? 'none' : '';
+    }
+
+    async function gateLogin() {
+      const tok = document.getElementById('gate-token').value.trim();
+      if (!tok) return;
+      const btn = document.getElementById('btn-gate');
+      const msg = document.getElementById('gate-msg');
+      btn.disabled = true;
+      btn.textContent = 'Validando…';
+      try {
+        const res = await fetch('/history/', { headers: { 'Authorization': 'Bearer ' + tok } });
+        if (res.status === 401) {
+          showGateMsg('✕ Token inválido.', 'var(--err-text)');
+          btn.disabled = false; btn.textContent = 'Entrar';
+          return;
+        }
+      } catch {
+        showGateMsg('⚠ Erro ao validar.', 'var(--err-text)');
+        btn.disabled = false; btn.textContent = 'Entrar';
+        return;
+      }
+      localStorage.setItem('api_token', tok);
+      btn.disabled = false; btn.textContent = 'Entrar';
+      updateTabLock();
+    }
+
+    function showGateMsg(text, color) {
+      const msg = document.getElementById('gate-msg');
+      msg.textContent = text; msg.style.color = color; msg.style.display = 'block';
+      setTimeout(() => { msg.style.display = 'none'; }, 3000);
+    }
+
+    /* init */
+    document.getElementById('gate-token').addEventListener('keydown', e => { if (e.key === 'Enter') gateLogin(); });
+    updateTabLock();
+
     /* ── tabs ── */
-    function switchTab(name) {
+    function switchTabRaw(name) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.getElementById('tab-' + name).classList.add('active');
       document.getElementById('panel-' + name).classList.add('active');
       if (name === 'historico') renderHistory();
+    }
+
+    function switchTab(name) {
+      if (AUTH_REQUIRED && !getToken()) return;
+      switchTabRaw(name);
     }
 
     /* ── history (server-side) ── */
@@ -580,13 +659,13 @@ _HTML = r"""<!DOCTYPE html>
     async function saveToHistory(cpf, nome, numero_certidao, duracao_segundos) {
       await fetch('/history/save', {
         method: 'POST',
-        headers: {'Content-Type':'application/json'},
+        headers: {'Content-Type':'application/json', ...authH()},
         body: JSON.stringify({ cpf, nome, numero_certidao, duracao_segundos })
       }).catch(() => {});
     }
 
     async function clearHistory() {
-      await fetch('/history/', { method: 'DELETE' }).catch(() => {});
+      await fetch('/history/', { method: 'DELETE', headers: {...authH()} }).catch(() => {});
       renderHistory();
     }
 
@@ -602,7 +681,7 @@ _HTML = r"""<!DOCTYPE html>
     async function renderHistory() {
       $histList.innerHTML = '<div class="hist-empty">Carregando…</div>';
       try {
-        const res  = await fetch('/history/');
+        const res  = await fetch('/history/', { headers: {...authH()} });
         const data = await res.json();
         const entries = data.entries || [];
         if (!entries.length) {
@@ -610,18 +689,18 @@ _HTML = r"""<!DOCTYPE html>
           return;
         }
         $histList.innerHTML = entries.map(h => `
-          <div class="hist-item" onclick="fillFromHistory('${h.cpf}','${(h.nome||'').replace(/'/g,"\\'")}')">
+          <div class="hist-item" onclick="fillFromHistory('${esc(h.cpf)}','${esc(h.nome||'')}')">
             <div style="flex:1;min-width:0">
-              <div class="hist-nome">${h.nome || '—'}</div>
+              <div class="hist-nome">${esc(h.nome) || '—'}</div>
               <div style="font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap">
-                <span>${h.cpf}</span>
-                ${h.numero_certidao ? `<span>Certidão ${h.numero_certidao}</span>` : ''}
-                ${h.ultima_duracao_s != null ? `<span>${h.ultima_duracao_s}s</span>` : ''}
+                <span>${esc(h.cpf)}</span>
+                ${h.numero_certidao ? `<span>Certidão ${esc(h.numero_certidao)}</span>` : ''}
+                ${h.ultima_duracao_s != null ? `<span>${esc(h.ultima_duracao_s)}s</span>` : ''}
               </div>
             </div>
             <div style="text-align:right;flex-shrink:0">
               <div class="hist-time">${fmtDt(h.ultima_consulta)}</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:2px">${h.consultas}× consultado</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(h.consultas)}× consultado</div>
             </div>
           </div>`).join('');
       } catch {
@@ -652,6 +731,7 @@ _HTML = r"""<!DOCTYPE html>
 </html>"""
 
 
-@router.get("/ui", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
 async def ui():
-    return _HTML
+    auth_required = "true" if _TOKEN else "false"
+    return _HTML.replace("__AUTH_REQUIRED__", auth_required)

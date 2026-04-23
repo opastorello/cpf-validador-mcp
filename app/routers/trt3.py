@@ -1,9 +1,14 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field
 import re
 from starlette.concurrency import run_in_threadpool
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from app.services.cpf import is_valido, formatar, gerar_cpfs_de_mascara
 from app.services.trt3 import consultar_trt3, consultar_trt3_multiplos
+from app import config as _cfg
+
+limiter = Limiter(key_func=get_remote_address)
 
 
 class CpfRequest(BaseModel):
@@ -13,25 +18,26 @@ class CpfRequest(BaseModel):
 class BuscarVariacoesRequest(BaseModel):
     cpf_parcial: str
     nome: str | None = None
-    workers: int = 8
+    workers: int = Field(default=_cfg.DEFAULT_WORKERS, ge=1, le=_cfg.MAX_WORKERS)
 
 
 class FeitosMultiplosRequest(BaseModel):
     cpfs: list[str]
-    workers: int = 8
+    workers: int = Field(default=_cfg.DEFAULT_WORKERS, ge=1, le=_cfg.MAX_WORKERS)
 
 
 class BuscarMascaraRequest(BaseModel):
     mascara: str
     nome: str | None = None
-    workers: int = 8
+    workers: int = Field(default=_cfg.DEFAULT_WORKERS, ge=1, le=_cfg.MAX_WORKERS)
 
 
 router = APIRouter(prefix="/trt3", tags=["trt3"])
 
 
 @router.post("/feitos")
-async def feitos(body: CpfRequest):
+@limiter.limit(_cfg.RATE_LIMIT_FEITOS)
+async def feitos(request: Request, body: CpfRequest):
     cpf_limpo = re.sub(r"\D", "", body.cpf)
     if len(cpf_limpo) != 11:
         raise HTTPException(status_code=422, detail="CPF deve ter 11 dígitos")
@@ -42,9 +48,9 @@ async def feitos(body: CpfRequest):
 
 
 @router.post("/buscar-por-variacoes")
-async def buscar_por_variacoes(body: BuscarVariacoesRequest):
-    """Consulta todas as variações válidas de um CPF parcial em paralelo.
-    Se 'nome' for informado, retorna apenas os matches com aquele nome na certidão."""
+@limiter.limit(_cfg.RATE_LIMIT_VARIACOES)
+async def buscar_por_variacoes(request: Request, body: BuscarVariacoesRequest):
+    """Consulta todas as variações válidas de um CPF parcial em paralelo."""
     cpf_limpo = re.sub(r"\D", "", body.cpf_parcial)
     if len(cpf_limpo) < 9:
         raise HTTPException(status_code=422, detail="CPF parcial deve ter ao menos 9 dígitos")
@@ -83,9 +89,9 @@ async def buscar_por_variacoes(body: BuscarVariacoesRequest):
 
 
 @router.post("/feitos-multiplos")
-async def feitos_multiplos(body: FeitosMultiplosRequest):
-    """Consulta feitos trabalhistas no TRT3 para uma lista de CPFs em paralelo.
-    CPFs inválidos são rejeitados individualmente; os válidos são consultados em paralelo."""
+@limiter.limit(_cfg.RATE_LIMIT_MULTIPLOS)
+async def feitos_multiplos(request: Request, body: FeitosMultiplosRequest):
+    """Consulta feitos trabalhistas no TRT3 para uma lista de CPFs em paralelo."""
     cpfs_validos = []
     erros = {}
 
@@ -107,10 +113,9 @@ async def feitos_multiplos(body: FeitosMultiplosRequest):
 
 
 @router.post("/buscar-por-mascara")
-async def buscar_por_mascara(body: BuscarMascaraRequest):
-    """Consulta TRT3 para todos os CPFs que encaixam na máscara com * nos dígitos desconhecidos.
-    Ex: mascara='***.587.570-**', nome='Italvino Rebelatto'
-    Os dígitos verificadores são sempre recalculados automaticamente."""
+@limiter.limit(_cfg.RATE_LIMIT_MASK)
+async def buscar_por_mascara(request: Request, body: BuscarMascaraRequest):
+    """Consulta TRT3 para todos os CPFs que encaixam na máscara com * nos dígitos desconhecidos."""
     try:
         candidates = gerar_cpfs_de_mascara(body.mascara)
     except ValueError as e:
