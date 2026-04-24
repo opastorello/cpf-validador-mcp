@@ -13,8 +13,8 @@ _ENV = os.getenv("ENV", "development").strip().lower()
 
 # Em produção, apenas "/" é acessível sem token via web
 # Em desenvolvimento, /docs, /redoc, /openapi.json e /health também ficam abertos
-_OPEN_PATHS_ALWAYS = {"/"}
-_OPEN_PATHS_DEV = {"/health", "/docs", "/redoc", "/openapi.json"}
+_OPEN_PATHS_ALWAYS = {"/", "/health"}
+_OPEN_PATHS_DEV = {"/docs", "/redoc", "/openapi.json"}
 
 _OPEN_PATHS = _OPEN_PATHS_ALWAYS | (_OPEN_PATHS_DEV if _ENV == "development" else set())
 
