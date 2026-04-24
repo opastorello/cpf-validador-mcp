@@ -52,6 +52,15 @@ Para confirmar a titularidade de um CPF, o sistema consulta o **TRT3** — que e
 
 Documentação interativa: `http://localhost:8000/docs` (disponível apenas em `ENV=development`).
 
+### 📂 Histórico de consultas
+
+O histórico é **global e compartilhado** — todas as consultas feitas pela interface web, pela REST API ou via MCP gravam no mesmo arquivo de histórico do servidor.
+
+- **Interface web:** o usuário pode ativar ou desativar o salvamento automático individualmente, através do toggle na aba Histórico. A preferência é salva no `localStorage` do navegador e não afeta outras interfaces.
+- **REST API / MCP:** toda consulta bem-sucedida é registrada no histórico global, independente do token utilizado.
+
+> **Roadmap:** no futuro está prevista a opção de múltiplos históricos isolados por token — permitindo que cada integração (web, API, MCP) mantenha seu próprio registro separado.
+
 ---
 
 ## 🏗️ Arquitetura
@@ -122,7 +131,7 @@ Todas as opções são lidas de variáveis de ambiente ou do arquivo `.env` na r
 | Rota | `development` | `production` |
 | ---- | :-----------: | :----------: |
 | `/` | ✅ aberta | ✅ aberta |
-| `/health` | ✅ aberta | 🔒 token |
+| `/health` | ✅ aberta | ✅ aberta |
 | `/docs` | ✅ aberta | 🔒 token |
 | `/redoc` | ✅ aberta | 🔒 token |
 | `/openapi.json` | ✅ aberta | 🔒 token |
