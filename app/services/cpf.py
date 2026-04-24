@@ -40,14 +40,17 @@ def validate_cpf(cpf: str) -> dict:
 
 
 def gerar_cpfs_de_mascara(mascara: str) -> list[str]:
-    """Gera todos os CPFs válidos a partir de uma máscara com * nos dígitos desconhecidos.
-    Ex: '***.587.570-**' → lista com todos os CPFs válidos com miolo 587570.
+    """Gera todos os CPFs válidos a partir de uma máscara com wildcards nos dígitos desconhecidos.
+    Wildcards aceitos: * , X , x , ? (equivalentes). Ex: '11X.593.91*-??' ou '***.587.570-**'.
     Os dígitos verificadores (posições 10-11) são sempre recalculados.
     """
+    # Normaliza wildcards: X, x e ? são equivalentes a *
+    mascara = mascara.upper().replace("X", "*").replace("?", "*")
+
     # Extrai sequência de dígitos e wildcards (ignora pontos, traços, espaços)
     chars = [c for c in mascara if c.isdigit() or c == "*"]
     if len(chars) != 11:
-        raise ValueError(f"Máscara deve ter 11 posições (dígitos ou *), recebeu {len(chars)}: '{mascara}'")
+        raise ValueError(f"Máscara deve ter 11 posições (dígitos ou * / X), recebeu {len(chars)}: '{mascara}'")
 
     # Posições 0-8 são a base; posições 9-10 são os verificadores (sempre recalculados)
     base_template = chars[:9]

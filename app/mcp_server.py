@@ -39,7 +39,7 @@ async def find_cpf_by_mask(mascara: str, nome: str | None = None, workers: int =
     Se 'nome' for informado, filtra somente os resultados que contenham o nome na certidão.
 
     Args:
-        mascara: CPF com * nos dígitos desconhecidos. Ex: '***.587.570-**', '382.***.570-**'
+        mascara: CPF com wildcards nos dígitos desconhecidos. Aceita * , X , x , ? (equivalentes). Ex: '11X.593.91X-00', '***.587.570-**'
         nome: nome ou parte do nome para filtrar (ex: 'Italvino Rebelatto')
         workers: número de threads paralelas (padrão 8)
     """

@@ -66,7 +66,7 @@ class FeitosMultiplosRequest(BaseModel):
 
 class BuscarMascaraRequest(BaseModel):
     model_config = {"json_schema_extra": {"example": {"mascara": "***.982.247-**", "nome": "joao"}}}
-    mascara: str = Field(..., description="CPF com `*` nos dígitos desconhecidos. Máximo de 5 wildcards na parte base (posições 0–8)", examples=["***.982.247-**", "529.982.***-**"])
+    mascara: str = Field(..., description="CPF com wildcards nos dígitos desconhecidos. Aceita `*`, `X`, `x` ou `?`. Máximo de 5 wildcards na parte base (posições 0–8)", examples=["11X.593.91X-00", "***.982.247-**", "529.982.***-**"])
     nome: str | None = Field(None, description="Fragmento do nome para filtrar os resultados (opcional, case-insensitive)", examples=["joao", "Maria Silva"])
     workers: int = Field(default=_cfg.DEFAULT_WORKERS, ge=1, le=_cfg.MAX_WORKERS, description=f"Threads paralelas para consulta ao TRT3 (1–{_cfg.MAX_WORKERS})")
 
