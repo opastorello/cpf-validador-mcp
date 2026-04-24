@@ -345,6 +345,47 @@ python -m app.captcha.registry
 
 ---
 
+## 🗺️ Roadmap
+
+Ideias e melhorias planejadas para versões futuras.
+
+### Escalabilidade
+- **Worker distribuído** — arquitetura de fila (Redis + worker nodes) onde cada nó é uma VPS com IP próprio contribuindo com slots de conexão ao TRT3. Escala horizontalmente: 1 worker = 20 slots, 5 workers = 100 slots, IPs diferentes reduzem risco de throttling.
+- **Cache de resultados** — CPFs já consultados recentemente retornam resultado armazenado sem nova requisição ao TRT3. Reduz latência e carga no tribunal.
+
+### Multi-usuário
+- **Histórico isolado por token** — cada integração (web, API, MCP) mantém seu próprio registro separado em vez do histórico global compartilhado atual.
+- **Quota de consultas por token** — cada token teria um limite mensal/diário de consultas configurável independentemente do rate limit por IP. Ex: token A = 1.000 consultas/dia, token B = 10.000/dia.
+- **Workers por token** — cada token teria um número máximo de workers simultâneos ao TRT3. Ex: token gratuito = 2 workers, token premium = 20 workers. Garante que um único cliente não monopoliza a capacidade do servidor enquanto outros aguardam.
+
+### Cobertura
+- **Suporte a outros tribunais** — expandir para TRT1 (RJ), TRT2 (SP) e demais regiões, consolidando resultados em uma única consulta.
+- **Consulta à Receita Federal** — validar situação cadastral do CPF diretamente na base da RF.
+
+### Observabilidade
+- **Dashboard de uso** — visualizar volume de consultas, taxa de acerto do CAPTCHA e latência média por endpoint.
+- **Alerta de bloqueio** — detectar automaticamente quando o TRT3 começa a retornar erros acima do normal e notificar.
+
+---
+
+## ⚖️ Responsabilidade de Uso
+
+Este projeto consulta exclusivamente o sistema público do **TRT3** ([certidao.trt3.jus.br](https://certidao.trt3.jus.br)) — os mesmos dados acessíveis por qualquer pessoa pelo navegador, sem login ou cadastro. As certidões emitidas são documentos públicos por determinação legal.
+
+**Usos adequados:**
+- Due diligence em processos de contratação
+- Verificação de titularidade em contextos jurídicos ou de compliance
+- Integração com agentes AI para automação de processos legítimos
+
+**O projeto não se destina a:**
+- Varredura em massa sem finalidade específica
+- Coleta de dados para fins não autorizados pela LGPD
+- Qualquer uso que viole a legislação brasileira vigente
+
+O código é aberto e auditável. A responsabilidade pelo uso é inteiramente do operador que implanta e utiliza o serviço. Rate limiting está configurado por padrão para desincentivar abuso.
+
+---
+
 ## 📄 Licença
 
 [MIT](LICENSE) © 2026 Nícolas Pastorello
