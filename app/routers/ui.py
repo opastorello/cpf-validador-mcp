@@ -591,7 +591,7 @@ _HTML = r"""<!DOCTYPE html>
         if (!hasMask) {
           const vd = await (await post('/cpf/validate', {cpf})).json();
           if (!vd.valido) {
-            failStep(s1, `CPF inválido — ${vd.mensagem}`);
+            failStep(s1, `CPF inválido — ${vd.mensagem || vd.detail || 'dígitos incorretos'}`);
             stopTimer();
             $out.innerHTML = `<div class="err-box">✕ CPF matematicamente inválido — verifique os dígitos.</div>`;
             return;
