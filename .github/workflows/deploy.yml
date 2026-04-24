@@ -1,0 +1,17 @@
+name: Deploy no Coolify
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aciona redeploy no Coolify
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_DEPLOY_TOKEN }}" \
+            "${{ secrets.COOLIFY_DEPLOY_WEBHOOK }}" \
+            | grep -q "200" && echo "Deploy acionado com sucesso" || echo "Falha ao acionar deploy"
