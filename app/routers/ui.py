@@ -247,21 +247,23 @@ _HTML = r"""<!DOCTYPE html>
       align-items: flex-start;
       justify-content: space-between;
       gap: 12px;
-      padding: 15px 18px 12px;
+      padding: 12px 16px 10px;
       border-bottom: 1px solid var(--border);
     }
 
-    .result-name { font-weight: 700; font-size: 16px; flex: 1; min-width: 0; }
+    .result-name { font-weight: 700; font-size: 15px; flex: 1; min-width: 0; }
     .result-indicator { white-space: nowrap; flex-shrink: 0; padding-top: 2px; }
 
-    .result-body { padding: 4px 18px 14px; }
+    .result-body { padding: 2px 16px 10px; }
+
+    .result-card + .result-card { margin-top: 8px; }
 
     .row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 9px 0;
-      font-size: 13.5px;
+      padding: 7px 0;
+      font-size: 13px;
       border-bottom: 1px solid var(--border);
       gap: 12px;
     }
@@ -414,6 +416,68 @@ _HTML = r"""<!DOCTYPE html>
       animation: rot .65s linear infinite;
       flex-shrink: 0;
     }
+
+    /* ── multi-result header bar ── */
+    .results-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 14px;
+      margin-bottom: 8px;
+    }
+
+    /* ── compact cards (> 3 results) ── */
+    .cc-wrap { display: flex; flex-direction: column; gap: 6px; }
+
+    .cc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 11px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .cc--mismatch { border-color: #f0883e; border-left: 3px solid #f0883e; background: rgba(240,136,62,.04); }
+
+    .cc-info { flex: 1; min-width: 0; }
+
+    .cc-name {
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .cc-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .cc-badge { font-size: 12px; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+
+    .btn-csv {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: inherit;
+      padding: 4px 10px;
+      cursor: pointer;
+      margin-top: 0;
+      width: auto;
+      transition: color .15s, border-color .15s;
+    }
+
+    .btn-csv:hover { color: var(--text); border-color: var(--muted); }
   </style>
 </head>
 <body>
@@ -459,10 +523,7 @@ _HTML = r"""<!DOCTYPE html>
           <input id="nome" type="text" placeholder="Nome completo da pessoa" autocomplete="off" />
           <p class="hint">Confirma se o CPF pertence a esta pessoa</p>
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button id="btn" onclick="verificar()" style="flex:1">Verificar</button>
-          <button id="cancel-btn" onclick="cancelar()" style="display:none;padding:0 16px;height:46px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-size:13px;white-space:nowrap">✕ Cancelar</button>
-        </div>
+        <button id="btn" onclick="verificar()">Verificar</button>
       </div>
 
       <div id="log-box" class="log-box" style="display:none">
@@ -488,7 +549,10 @@ _HTML = r"""<!DOCTYPE html>
             </span>
             Salvar histórico
           </label>
-          <button class="hist-clear" onclick="clearHistory()">Limpar histórico</button>
+          <div style="display:flex;gap:6px">
+            <button class="hist-clear" onclick="downloadHistCSV()">↓ CSV</button>
+            <button class="hist-clear" onclick="clearHistory()">Limpar</button>
+          </div>
         </div>
         <div id="hist-list"></div>
       </div>
@@ -571,9 +635,25 @@ _HTML = r"""<!DOCTYPE html>
     const authH = () => { const t = getToken(); return t ? {'Authorization': 'Bearer ' + t} : {}; };
 
     let _abort = null;
-    const $cancelBtn = document.getElementById('cancel-btn');
+    let _lastResultados = [];
+    let _lastBusca = '';
 
     function cancelar() { if (_abort) _abort.abort(); }
+
+    function downloadCSV(dados) {
+      const src = dados || _lastResultados;
+      if (!src.length) return;
+      const hdr = ['Nome','CPF','Tipo Certidão','Válida até','Nº Certidão'];
+      const rows = src.map(d => [d.nome_certidao||'',d.cpf||'',d.tipo_certidao||'',d.valida_ate||'',d.numero_certidao||'']);
+      const csv = [hdr,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const slug = _lastBusca.replace(/[^a-zA-Z0-9.\-]/g, '_').replace(/_+/g,'_').replace(/^_|_$/g,'');
+      const filename = `${slug}-${new Date().toISOString().slice(0,10)}.csv`;
+      const a = Object.assign(document.createElement('a'),{
+        href: URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})),
+        download: filename
+      });
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
 
     /* ── main ── */
     async function verificar() {
@@ -585,9 +665,10 @@ _HTML = r"""<!DOCTYPE html>
       const {signal} = _abort;
       const post = (path, body) => fetch(path, {method:'POST', signal, headers:{'Content-Type':'application/json',...authH()}, body:JSON.stringify(body)});
 
-      $btn.disabled = true;
-      $btn.innerHTML = '<span class="spin"></span>Verificando…';
-      $cancelBtn.style.display = 'block';
+      _lastBusca = cpf;
+      $btn.onclick = cancelar;
+      $btn.textContent = '✕ Cancelar';
+      $btn.style.cssText = 'background:transparent;border:1px solid var(--border);color:var(--muted)';
       $out.innerHTML = '';
       resetLog();
       startTimer();
@@ -781,10 +862,13 @@ _HTML = r"""<!DOCTYPE html>
               if (evt.total && evt.progress === undefined && !evt.done && !evt.match) {
                 s2.querySelector('span:last-child').textContent =
                   `${evt.total} combinaç${evt.total!=1?'ões':'ão'} calculada${evt.total!=1?'s':''}`;
-                s4.querySelector('span:last-child').textContent = `Testando em paralelo… 0/${evt.total}`;
+                s4.querySelector('span:last-child').textContent = evt.total === 1
+                  ? 'Resolvendo CAPTCHA…'
+                  : `Testando em paralelo… 0/${evt.total}`;
               } else if (evt.progress !== undefined) {
-                s4.querySelector('span:last-child').textContent =
-                  `Testando em paralelo… ${evt.progress}/${evt.total}`;
+                s4.querySelector('span:last-child').textContent = evt.total === 1
+                  ? 'Resolvendo CAPTCHA…'
+                  : `Testando em paralelo… ${evt.progress}/${evt.total}`;
               } else if (evt.match) {
                 liveMatches.push(evt.match); renderLive();
               } else if (evt.done) {
@@ -832,45 +916,44 @@ _HTML = r"""<!DOCTYPE html>
           });
         }
 
-        const cards = resultados.map(d => {
+        const duracaoS = parseFloat($el.textContent);
+        _lastResultados = resultados;
+        resultados.forEach(d => {
+          if (d.nome_certidao) saveToHistory(d.cpf || cpf, d.nome_certidao, d.numero_certidao || null, duracaoS || null);
+        });
+
+        const metaStr = (hasMask || useVariations) && resultados.length > 1
+          ? `${resultados.length} resultado${resultados.length!==1?'s':''} · ${totalCandidatos} candidatos · ${$el.textContent}`
+          : resultados.length > 1 ? `${resultados.length} resultados` : '';
+
+        const mkCard = d => {
           const nomeReal = d.nome_certidao || '—';
           const cpfFmt   = d.cpf || cpf;
           const bate     = nome ? nomeMatch(nomeReal, nome) : null;
-
           const indicator = bate === true
             ? `<span class="result-indicator" style="color:#3fb950;font-weight:500;font-size:13px">✓ Confirmado</span>`
             : bate === false
             ? `<span class="result-indicator" style="color:#f0883e;font-weight:600;font-size:13px">✕ Nome não bate</span>`
             : '';
-
           const pdfLink = d.pdf_url
             ? `<a href="${safeUrl(d.pdf_url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none;font-weight:500">↗ Abrir PDF</a>`
             : '—';
-
           const cardClass = bate === false ? 'result-card result-card--mismatch' : 'result-card';
-
-          return `
-          <div class="${cardClass}">
-            <div class="result-head">
-              <span class="result-name">${esc(nomeReal)}</span>
-              ${indicator}
-            </div>
+          return `<div class="${cardClass}">
+            <div class="result-head"><span class="result-name">${esc(nomeReal)}</span>${indicator}</div>
             <div class="result-body">
               ${row('CPF', esc(cpfFmt))}
               ${d.numero_certidao ? row('Nº da certidão', esc(d.numero_certidao)) : ''}
-              ${d.pdf_url         ? row('Certidão PDF', pdfLink) : ''}
+              ${d.pdf_url ? row('Certidão PDF', pdfLink) : ''}
               ${bate === false ? row('⚠️ Nome buscado', `<span style="color:#f0883e;font-weight:500">${esc(nome)}</span>`) : ''}
-            </div>
-          </div>`;
-        }).join('');
+            </div></div>`;
+        };
 
-        $out.innerHTML = cards;
-        const duracaoS = parseFloat($el.textContent);
-        resultados.forEach(d => {
-          if (d.nome_certidao) saveToHistory(d.cpf || cpf, d.nome_certidao, d.numero_certidao || null, duracaoS || null);
-        });
-        if ((hasMask || useVariations) && resultados.length > 1) {
-          $out.innerHTML += `<div class="meta">${resultados.length} resultados encontrados · ${totalCandidatos} candidatos testados · ${$el.textContent}</div>`;
+        const cardsHtml = resultados.map(mkCard).join('');
+        if (metaStr) {
+          $out.innerHTML = `<div class="results-bar"><span class="meta" style="margin:0">${metaStr}</span><button class="btn-csv" onclick="downloadCSV()">↓ CSV</button></div>${cardsHtml}`;
+        } else {
+          $out.innerHTML = cardsHtml;
         }
 
       } catch(e) {
@@ -889,9 +972,10 @@ _HTML = r"""<!DOCTYPE html>
           $out.innerHTML = `<div class="err-box">⚠️ ${esc(e.message)}</div>`;
         }
       } finally {
-        $cancelBtn.style.display = 'none';
-        $btn.disabled = false;
+        $btn.onclick = verificar;
         $btn.textContent = 'Verificar';
+        $btn.style.cssText = '';
+        $btn.disabled = false;
       }
     }
 
@@ -975,6 +1059,22 @@ _HTML = r"""<!DOCTYPE html>
     async function clearHistory() {
       await fetch('/history/', { method: 'DELETE', headers: {...authH()} }).catch(() => {});
       renderHistory();
+    }
+
+    async function downloadHistCSV() {
+      const res = await fetch('/history/', {headers: {...authH()}}).catch(() => null);
+      if (!res || !res.ok) return;
+      const data = await res.json();
+      const entries = data.entries || [];
+      if (!entries.length) return;
+      const hdr = ['Nome','CPF','Nº Certidão','Consultas','Última consulta','Duração (s)'];
+      const rows = entries.map(h => [h.nome||'',h.cpf||'',h.numero_certidao||'',h.consultas||'',h.ultima_consulta||'',h.ultima_duracao_s||'']);
+      const csv = [hdr,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const a = Object.assign(document.createElement('a'),{
+        href: URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})),
+        download: `historico-${new Date().toISOString().slice(0,10)}.csv`
+      });
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
 
     async function deleteHistoryEntry(cpf) {
