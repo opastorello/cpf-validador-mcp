@@ -122,7 +122,7 @@ def clear_all():
     responses={200: {"content": {"application/json": {"example": {"ok": True}}}}},
 )
 def delete_entry(
-    cpf_raw: str = Path(..., description="CPF a remover (com ou sem formatação)", example="529.982.247-25"),
+    cpf_raw: str = Path(..., description="CPF a remover (com ou sem formatação)", examples=["529.982.247-25"]),
 ):
     key = cpf_raw.replace(".", "").replace("-", "")
     with _lock:
