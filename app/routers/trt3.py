@@ -181,9 +181,12 @@ async def buscar_por_mascara_stream(request: Request, body: BuscarMascaraRequest
     def on_progress(done: int, tot: int):
         loop.call_soon_threadsafe(q.put_nowait, {"progress": done, "total": tot})
 
+    def on_match(result: dict):
+        loop.call_soon_threadsafe(q.put_nowait, {"match": result})
+
     def run():
         try:
-            result = consultar_trt3_multiplos(candidates, body.nome, body.workers, progress_cb=on_progress)
+            result = consultar_trt3_multiplos(candidates, body.nome, body.workers, progress_cb=on_progress, match_cb=on_match)
             result["candidatos_gerados"] = total
             loop.call_soon_threadsafe(q.put_nowait, {"done": True, "result": result})
         except Exception as e:
@@ -272,9 +275,12 @@ async def buscar_por_variacoes_stream(request: Request, body: BuscarVariacoesReq
     def on_progress(done: int, tot: int):
         loop.call_soon_threadsafe(q.put_nowait, {"progress": done, "total": tot})
 
+    def on_match(result: dict):
+        loop.call_soon_threadsafe(q.put_nowait, {"match": result})
+
     def run():
         try:
-            result = consultar_trt3_multiplos(candidates, body.nome, body.workers, progress_cb=on_progress)
+            result = consultar_trt3_multiplos(candidates, body.nome, body.workers, progress_cb=on_progress, match_cb=on_match)
             result["candidatos_gerados"] = total
             loop.call_soon_threadsafe(q.put_nowait, {"done": True, "result": result})
         except Exception as e:

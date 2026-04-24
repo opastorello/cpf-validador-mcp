@@ -459,8 +459,10 @@ _HTML = r"""<!DOCTYPE html>
           <input id="nome" type="text" placeholder="Nome completo da pessoa" autocomplete="off" />
           <p class="hint">Confirma se o CPF pertence a esta pessoa</p>
         </div>
-        <button id="btn" onclick="verificar()">Verificar</button>
-        <button id="cancel-btn" onclick="cancelar()" style="display:none;margin-top:8px;width:100%;padding:10px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-size:14px">✕ Cancelar busca</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="btn" onclick="verificar()" style="flex:1">Verificar</button>
+          <button id="cancel-btn" onclick="cancelar()" style="display:none;padding:0 16px;height:46px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-size:13px;white-space:nowrap">✕ Cancelar</button>
+        </div>
       </div>
 
       <div id="log-box" class="log-box" style="display:none">
@@ -593,6 +595,49 @@ _HTML = r"""<!DOCTYPE html>
       const hasMask = /[xX]/.test(cpf);
       const xs = (cpf.replace(/[^\dxX]/gi,'').match(/x/gi)||[]).length;
 
+      let liveMatches = [];
+      let resultados  = [];
+
+      function renderLive() {
+        if (!liveMatches.length) return;
+        let sorted = [...liveMatches];
+        if (nome) {
+          const n = nome.toLowerCase();
+          const sc = nm => {
+            const s = nm.toLowerCase();
+            if (s.startsWith(n)) return 0;
+            if (s.split(/\s+/).some(w => w.startsWith(n))) return 1;
+            return 2;
+          };
+          sorted.sort((a, b) => {
+            const sa = sc(a.nome_certidao || ''), sb = sc(b.nome_certidao || '');
+            return sa !== sb ? sa - sb : (a.nome_certidao || '').localeCompare(b.nome_certidao || '');
+          });
+        }
+        $out.innerHTML = sorted.map(d => {
+          const nomeReal = d.nome_certidao || '—';
+          const cpfFmt   = d.cpf || cpf;
+          const bate     = nome ? nomeMatch(nomeReal, nome) : null;
+          const indicator = bate === true
+            ? `<span class="result-indicator" style="color:#3fb950;font-weight:500;font-size:13px">✓ Confirmado</span>`
+            : bate === false
+            ? `<span class="result-indicator" style="color:#f0883e;font-weight:600;font-size:13px">✕ Nome não bate</span>`
+            : '';
+          const pdfLink = d.pdf_url
+            ? `<a href="${safeUrl(d.pdf_url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none;font-weight:500">↗ Abrir PDF</a>`
+            : '—';
+          const cardClass = bate === false ? 'result-card result-card--mismatch' : 'result-card';
+          return `<div class="${cardClass}">
+            <div class="result-head"><span class="result-name">${esc(nomeReal)}</span>${indicator}</div>
+            <div class="result-body">
+              ${row('CPF', esc(cpfFmt))}
+              ${d.numero_certidao ? row('Nº da certidão', esc(d.numero_certidao)) : ''}
+              ${d.pdf_url ? row('Certidão PDF', pdfLink) : ''}
+              ${bate === false ? row('⚠️ Nome buscado', `<span style="color:#f0883e;font-weight:500">${esc(nome)}</span>`) : ''}
+            </div></div>`;
+        }).join('');
+      }
+
       try {
         /* 1 — validar */
         const s1 = addStep('Validando CPF…');
@@ -645,8 +690,6 @@ _HTML = r"""<!DOCTYPE html>
           ? 'Aguardando contagem de candidatos…'
           : 'Resolvendo CAPTCHA…');
 
-        let resultados = [];
-
         if (useVariations) {
           /* caminho rápido: testa só o CPF com dígitos recalculados (variações[0]) */
           const recalcCpf = variations[0]?.cpf_numeros;
@@ -692,6 +735,8 @@ _HTML = r"""<!DOCTYPE html>
                 const evt = JSON.parse(chunk.slice(6));
                 if (evt.progress !== undefined) {
                   s4.querySelector('span:last-child').textContent = `${evt.progress}/${evt.total} variações testadas…`;
+                } else if (evt.match) {
+                  liveMatches.push(evt.match); renderLive();
                 } else if (evt.done) {
                   vfinal = evt.result;
                   break vouter;
@@ -700,7 +745,7 @@ _HTML = r"""<!DOCTYPE html>
             }
             if (!vfinal) throw new Error('Stream de variações encerrado sem resultado');
             doneStep(s4, `${totalCandidatos} CAPTCHA${totalCandidatos!==1?'s':''} resolvido${totalCandidatos!==1?'s':''}`);
-            resultados = Object.values(vfinal.matches || {});
+            resultados = liveMatches;
           }
         } else if (hasMask) {
           const mascara = cpf.toUpperCase().replace(/X/g,'*');
@@ -733,13 +778,15 @@ _HTML = r"""<!DOCTYPE html>
               buf = buf.slice(boundary + 2);
               if (!chunk.startsWith('data: ')) continue;
               const evt = JSON.parse(chunk.slice(6));
-              if (evt.total && evt.progress === undefined && !evt.done) {
+              if (evt.total && evt.progress === undefined && !evt.done && !evt.match) {
                 s2.querySelector('span:last-child').textContent =
                   `${evt.total} combinaç${evt.total!=1?'ões':'ão'} calculada${evt.total!=1?'s':''}`;
                 s4.querySelector('span:last-child').textContent = `Testando em paralelo… 0/${evt.total}`;
               } else if (evt.progress !== undefined) {
                 s4.querySelector('span:last-child').textContent =
                   `Testando em paralelo… ${evt.progress}/${evt.total}`;
+              } else if (evt.match) {
+                liveMatches.push(evt.match); renderLive();
               } else if (evt.done) {
                 finalData = evt.result;
                 break outer;
@@ -753,7 +800,7 @@ _HTML = r"""<!DOCTYPE html>
           totalCandidatos = finalData.candidatos_gerados || '?';
           s2.querySelector('span:last-child').textContent = `${totalCandidatos} combinaç${totalCandidatos!=1?'ões':'ão'} calculada${totalCandidatos!=1?'s':''}`;
           doneStep(s4, `${totalCandidatos} CAPTCHA${totalCandidatos!=1?'s':''} resolvido${totalCandidatos!=1?'s':''}`);
-          resultados = Object.values(finalData.matches || {});
+          resultados = liveMatches;
         } else {
           const res  = await post('/trt3/feitos', {cpf});
           const data = await res.json();

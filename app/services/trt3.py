@@ -187,19 +187,30 @@ def consultar_trt3(cpf_limpo: str) -> dict:
     return _consultar_trt3_interno(cpf_limpo)
 
 
-def consultar_trt3_multiplos(cpfs: list[str], nome_filtro: str | None = None, workers: int | None = None, progress_cb=None) -> dict:
+def consultar_trt3_multiplos(cpfs: list[str], nome_filtro: str | None = None, workers: int | None = None, progress_cb=None, match_cb=None) -> dict:
     from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeout
 
     n_workers = max(1, min(workers if workers is not None else _cfg.DEFAULT_WORKERS, _cfg.MAX_WORKERS))
+    filtro = nome_filtro.lower() if nome_filtro else None
 
     resultados = {}
+    matches = {}
     completed = 0
     with ThreadPoolExecutor(max_workers=n_workers) as executor:
         futures = {executor.submit(_consultar_trt3_interno, cpf): cpf for cpf in cpfs}
         for future in as_completed(futures):
             cpf = futures[future]
             try:
-                resultados[cpf] = future.result(timeout=_cfg.TASK_TIMEOUT)
+                result = future.result(timeout=_cfg.TASK_TIMEOUT)
+                resultados[cpf] = result
+                is_match = (
+                    filtro in (result.get("nome_certidao") or "").lower()
+                    if filtro else result.get("encontrado") is True
+                )
+                if is_match:
+                    matches[cpf] = result
+                    if match_cb:
+                        match_cb(result)
             except FutureTimeout:
                 resultados[cpf] = {"cpf": _formatar(cpf), "encontrado": None, "erro": f"Timeout após {_cfg.TASK_TIMEOUT}s"}
             except Exception as e:
@@ -207,14 +218,5 @@ def consultar_trt3_multiplos(cpfs: list[str], nome_filtro: str | None = None, wo
             completed += 1
             if progress_cb:
                 progress_cb(completed, len(cpfs))
-
-    if nome_filtro:
-        filtro = nome_filtro.lower()
-        matches = {
-            cpf: r for cpf, r in resultados.items()
-            if filtro in (r.get("nome_certidao") or "").lower()
-        }
-    else:
-        matches = {cpf: r for cpf, r in resultados.items() if r.get("encontrado") is True}
 
     return {"total": len(cpfs), "matches": matches, "resultados": resultados}
