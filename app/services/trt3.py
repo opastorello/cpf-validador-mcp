@@ -1,6 +1,7 @@
 import re
 import io
 import time
+import threading
 from pypdf import PdfReader
 from curl_cffi import requests as _requests
 from app.captcha.predictor import predict as _solve_captcha
@@ -8,6 +9,9 @@ from app import config as _cfg
 
 _TRT3_BASE = _cfg.TRT3_BASE_URL
 _TRT3_URL = f"{_TRT3_BASE}{_cfg.TRT3_FORM_PATH}"
+
+# Limita conexões simultâneas ao TRT3 independente de quantos usuários estão consultando
+_TRT3_SEMAPHORE = threading.Semaphore(_cfg.MAX_WORKERS)
 
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -122,6 +126,11 @@ def _parse_html_resultado(cpf_limpo, cpf_fmt, resp) -> dict:
 
 def _consultar_trt3_interno(cpf_limpo: str) -> dict:
     cpf_fmt = _formatar(cpf_limpo)
+    with _TRT3_SEMAPHORE:
+        return _consultar_trt3_com_sessao(cpf_limpo, cpf_fmt)
+
+
+def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
     session = _requests.Session(impersonate="chrome124")
 
     for attempt in range(_cfg.MAX_CAPTCHA_ATTEMPTS):
