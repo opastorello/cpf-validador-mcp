@@ -611,10 +611,12 @@ _HTML = r"""<!DOCTYPE html>
           ? `Calculando combinações para ${xs} dígito${xs>1?'s':''} desconhecido${xs>1?'s':''}…`
           : 'Preparando consulta…');
         await delay(300);
+        let variations = [];
         if (useVariations) {
           const vrResp = await post('/cpf/variations', {cpf});
           const vrData = await vrResp.json();
-          totalCandidatos = (vrData.variations || []).length;
+          variations = vrData.variations || [];
+          totalCandidatos = variations.length;
           if (!totalCandidatos) throw new Error('Nenhuma variação válida encontrada para este CPF');
           doneStep(s2, `${totalCandidatos} variação${totalCandidatos!==1?'ões':'ão'} válida${totalCandidatos!==1?'s':''}`);
         } else {
@@ -628,7 +630,7 @@ _HTML = r"""<!DOCTYPE html>
 
         /* 4 — captcha (fetch real) */
         const s4 = addStep(useVariations
-          ? 'Consultando variações no TRT3…'
+          ? 'Testando CPF recalculado…'
           : hasMask
           ? `Testando em paralelo… 0/${estimadoCandidatos}`
           : 'Resolvendo CAPTCHA…');
@@ -636,11 +638,29 @@ _HTML = r"""<!DOCTYPE html>
         let resultados = [];
 
         if (useVariations) {
-          const res  = await post('/trt3/buscar-por-variacoes', {cpf_parcial: cpf, nome, workers: 8});
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.detail || 'Erro na consulta de variações');
-          doneStep(s4, `${totalCandidatos} CAPTCHA${totalCandidatos!==1?'s':''} resolvido${totalCandidatos!==1?'s':''}`);
-          resultados = Object.values(data.matches || {});
+          /* caminho rápido: testa só o CPF com dígitos recalculados (variações[0]) */
+          const recalcCpf = variations[0]?.cpf_numeros;
+          let found = false;
+          if (recalcCpf) {
+            const fastRes  = await post('/trt3/feitos', {cpf: recalcCpf});
+            const fastData = await fastRes.json();
+            if (fastRes.ok && fastData.nome_certidao) {
+              const bate = !nome || nomeMatch(fastData.nome_certidao, nome);
+              if (bate) {
+                doneStep(s4, 'CPF recalculado confirmado — 1 CAPTCHA');
+                resultados = [fastData];
+                found = true;
+              }
+            }
+          }
+          if (!found) {
+            s4.querySelector('span:last-child').textContent = `Expandindo para ${totalCandidatos} variações…`;
+            const res  = await post('/trt3/buscar-por-variacoes', {cpf_parcial: cpf, nome, workers: 8});
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Erro na consulta de variações');
+            doneStep(s4, `${totalCandidatos} CAPTCHA${totalCandidatos!==1?'s':''} resolvido${totalCandidatos!==1?'s':''}`);
+            resultados = Object.values(data.matches || {});
+          }
         } else if (hasMask) {
           const mascara = cpf.toUpperCase().replace(/X/g,'*');
           const resp = await fetch('/trt3/buscar-por-mascara/stream', {
@@ -648,7 +668,11 @@ _HTML = r"""<!DOCTYPE html>
             headers: {'Content-Type': 'application/json', ...authH()},
             body: JSON.stringify({mascara, nome, workers: 8}),
           });
-          if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Erro na consulta'); }
+          if (!resp.ok) {
+            let msg = `Erro HTTP ${resp.status}`;
+            try { const e = await resp.json(); msg = e.detail || e.error || msg; } catch {}
+            throw new Error(msg);
+          }
 
           const reader = resp.body.getReader();
           const dec = new TextDecoder();
@@ -701,6 +725,22 @@ _HTML = r"""<!DOCTYPE html>
           return;
         }
 
+        if (nome) {
+          const n = nome.toLowerCase();
+          const score = nm => {
+            const s = nm.toLowerCase();
+            if (s.startsWith(n)) return 0;
+            if (s.split(/\s+/).some(w => w.startsWith(n))) return 1;
+            return 2;
+          };
+          resultados.sort((a, b) => {
+            const sa = score(a.nome_certidao || '');
+            const sb = score(b.nome_certidao || '');
+            if (sa !== sb) return sa - sb;
+            return (a.nome_certidao || '').localeCompare(b.nome_certidao || '');
+          });
+        }
+
         const cards = resultados.map(d => {
           const nomeReal = d.nome_certidao || '—';
           const cpfFmt   = d.cpf || cpf;
@@ -744,6 +784,7 @@ _HTML = r"""<!DOCTYPE html>
 
       } catch(e) {
         stopTimer();
+        $steps.querySelectorAll('.step:not(.done):not(.fail)').forEach(el => failStep(el, null));
         $out.innerHTML = `<div class="err-box">⚠️ ${esc(e.message)}</div>`;
       } finally {
         $btn.disabled = false;
