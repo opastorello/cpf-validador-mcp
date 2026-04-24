@@ -274,9 +274,50 @@ _HTML = r"""<!DOCTYPE html>
 
     .hist-actions {
       display: flex;
-      justify-content: flex-end;
+      justify-content: space-between;
+      align-items: center;
       margin-bottom: 10px;
     }
+
+    .toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      user-select: none;
+      cursor: pointer;
+    }
+
+    .toggle {
+      position: relative;
+      width: 32px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .toggle input { display: none; }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 9px;
+      transition: background .2s;
+    }
+
+    .toggle input:checked + .toggle-track { background: var(--accent); }
+
+    .toggle-thumb {
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 12px; height: 12px;
+      background: #fff;
+      border-radius: 50%;
+      transition: left .2s;
+    }
+
+    .toggle input:checked ~ .toggle-thumb { left: 17px; }
 
     .hist-clear {
       background: none;
@@ -428,6 +469,14 @@ _HTML = r"""<!DOCTYPE html>
     <div class="tab-panel" id="panel-historico">
       <div class="card">
         <div class="hist-actions">
+          <label class="toggle-wrap" title="Salvar automaticamente as consultas no histórico">
+            <span class="toggle">
+              <input type="checkbox" id="toggle-hist" onchange="setHistoryEnabled(this.checked)">
+              <span class="toggle-track"></span>
+              <span class="toggle-thumb"></span>
+            </span>
+            Salvar histórico
+          </label>
           <button class="hist-clear" onclick="clearHistory()">Limpar histórico</button>
         </div>
         <div id="hist-list"></div>
@@ -680,7 +729,7 @@ _HTML = r"""<!DOCTYPE html>
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.getElementById('tab-' + name).classList.add('active');
       document.getElementById('panel-' + name).classList.add('active');
-      if (name === 'historico') renderHistory();
+      if (name === 'historico') { initHistoryToggle(); renderHistory(); }
     }
 
     function switchTab(name) {
@@ -691,7 +740,18 @@ _HTML = r"""<!DOCTYPE html>
     /* ── history (server-side) ── */
     const $histList = document.getElementById('hist-list');
 
+    const isHistoryEnabled = () => localStorage.getItem('history_enabled') !== 'false';
+
+    function setHistoryEnabled(val) {
+      localStorage.setItem('history_enabled', val ? 'true' : 'false');
+    }
+
+    function initHistoryToggle() {
+      document.getElementById('toggle-hist').checked = isHistoryEnabled();
+    }
+
     async function saveToHistory(cpf, nome, numero_certidao, duracao_segundos) {
+      if (!isHistoryEnabled()) return;
       await fetch('/history/save', {
         method: 'POST',
         headers: {'Content-Type':'application/json', ...authH()},
