@@ -236,6 +236,12 @@ _HTML = r"""<!DOCTYPE html>
       margin-top: 14px;
     }
 
+    .result-card--mismatch {
+      border-color: #f0883e;
+      border-left: 3px solid #f0883e;
+      background: rgba(240, 136, 62, 0.04);
+    }
+
     .result-head {
       display: flex;
       align-items: center;
@@ -641,17 +647,19 @@ _HTML = r"""<!DOCTYPE html>
           const bate     = nome ? nomeMatch(nomeReal, nome) : null;
 
           const indicator = bate === true
-            ? `<span style="color:var(--muted);font-weight:500;font-size:13px">✓ Confirmado</span>`
+            ? `<span style="color:#3fb950;font-weight:500;font-size:13px">✓ Confirmado</span>`
             : bate === false
-            ? `<span style="color:var(--muted);font-weight:500;font-size:13px">✕ Nome não bate</span>`
+            ? `<span style="color:#f0883e;font-weight:600;font-size:13px">✕ Nome não bate</span>`
             : '';
 
           const pdfLink = d.pdf_url
             ? `<a href="${safeUrl(d.pdf_url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:none;font-weight:500">↗ Abrir PDF</a>`
             : '—';
 
+          const cardClass = bate === false ? 'result-card result-card--mismatch' : 'result-card';
+
           return `
-          <div class="result-card">
+          <div class="${cardClass}">
             <div class="result-head">
               <span class="result-name">${esc(nomeReal)}</span>
               ${indicator}
@@ -660,6 +668,7 @@ _HTML = r"""<!DOCTYPE html>
               ${row('CPF', esc(cpfFmt))}
               ${d.numero_certidao ? row('Nº da certidão', esc(d.numero_certidao)) : ''}
               ${d.pdf_url         ? row('Certidão PDF', pdfLink) : ''}
+              ${bate === false ? row('⚠️ Nome buscado', `<span style="color:#f0883e;font-weight:500">${esc(nome)}</span>`) : ''}
             </div>
           </div>`;
         }).join('');
