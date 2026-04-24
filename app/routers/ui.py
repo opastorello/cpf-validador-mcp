@@ -600,11 +600,12 @@ _HTML = r"""<!DOCTYPE html>
         }
 
         /* 2 — candidatos */
+        const estimadoCandidatos = hasMask ? Math.pow(10, xs) : 1;
         const s2 = addStep(hasMask
           ? `Calculando combinações para ${xs} dígito${xs>1?'s':''} desconhecido${xs>1?'s':''}…`
           : 'Preparando consulta…');
         await delay(300);
-        doneStep(s2, hasMask ? 'Calculando…' : '1 CPF');
+        doneStep(s2, hasMask ? `~${estimadoCandidatos} combinaç${estimadoCandidatos!=1?'ões':'ão'} a testar` : '1 CPF');
 
         /* 3 — conectar */
         const s3 = addStep('Conectando ao servidor…');
@@ -612,7 +613,9 @@ _HTML = r"""<!DOCTYPE html>
         doneStep(s3, 'Conexão estabelecida');
 
         /* 4 — captcha (fetch real) */
-        const s4 = addStep(hasMask ? 'Resolvendo CAPTCHAs em paralelo…' : 'Resolvendo CAPTCHA…');
+        const s4 = addStep(hasMask
+          ? `Testando ~${estimadoCandidatos} candidato${estimadoCandidatos!=1?'s':''} em paralelo…`
+          : 'Resolvendo CAPTCHA…');
 
         let resultados = [];
         let totalCandidatos = 1;
@@ -623,7 +626,7 @@ _HTML = r"""<!DOCTYPE html>
           const data = await res.json();
           if (!res.ok) throw new Error(data.detail || 'Erro na consulta');
           totalCandidatos = data.candidatos_gerados || '?';
-          s2.querySelector('span:last-child').textContent = `${totalCandidatos} combinação${totalCandidatos!=1?'s':''} calculada${totalCandidatos!=1?'s':''}`;
+          s2.querySelector('span:last-child').textContent = `${totalCandidatos} combinaç${totalCandidatos!=1?'ões':'ão'} calculada${totalCandidatos!=1?'s':''}`;
           doneStep(s4, `${totalCandidatos} CAPTCHA${totalCandidatos!=1?'s':''} resolvido${totalCandidatos!=1?'s':''}`);
           resultados = Object.values(data.matches || {});
         } else {
