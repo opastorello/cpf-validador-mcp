@@ -206,24 +206,9 @@ async def buscar_por_mascara_stream(request: Request, body: BuscarMascaraRequest
     )
 
 
-@router.post(
-    "/buscar-por-variacoes",
-    summary="Recupera CPF correto a partir de dígitos errados ou incompletos",
-    description=(
-        "Recebe um CPF parcial ou com erros (9 a 11 dígitos), gera todos os candidatos válidos "
-        "aplicando as estratégias: inserção de dígito, troca de dígito e transposição. "
-        "Consulta o TRT3 em paralelo e filtra pelo nome quando informado. "
-        "Ideal para recuperar um CPF com um dígito faltando ou digitado errado."
-    ),
-    responses={200: {"content": {"application/json": {"example": _EXAMPLE_VARIACOES}}}},
-)
-@limiter.limit(_cfg.RATE_LIMIT_VARIACOES)
-async def buscar_por_variacoes(request: Request, body: BuscarVariacoesRequest):
-    cpf_limpo = re.sub(r"\D", "", body.cpf_parcial)
-    if len(cpf_limpo) < 9:
-        raise HTTPException(status_code=422, detail="CPF parcial deve ter ao menos 9 dígitos")
-
-    candidates = set()
+def _gerar_candidatos_variacoes(cpf_parcial: str) -> list[str]:
+    cpf_limpo = re.sub(r"\D", "", cpf_parcial)
+    candidates: set[str] = set()
     if len(cpf_limpo) == 11:
         from app.services.cpf import generate_valid_variations
         result = generate_valid_variations(cpf_limpo)
@@ -245,12 +230,68 @@ async def buscar_por_variacoes(request: Request, body: BuscarVariacoesRequest):
                         c = modified[:pos] + digit + modified[pos:]
                         if is_valido(c):
                             candidates.add(c)
+    return list(candidates)
 
+
+@router.post(
+    "/buscar-por-variacoes",
+    summary="Recupera CPF correto a partir de dígitos errados ou incompletos",
+    description=(
+        "Recebe um CPF parcial ou com erros (9 a 11 dígitos), gera todos os candidatos válidos "
+        "aplicando as estratégias: inserção de dígito, troca de dígito e transposição. "
+        "Consulta o TRT3 em paralelo e filtra pelo nome quando informado. "
+        "Ideal para recuperar um CPF com um dígito faltando ou digitado errado."
+    ),
+    responses={200: {"content": {"application/json": {"example": _EXAMPLE_VARIACOES}}}},
+)
+@limiter.limit(_cfg.RATE_LIMIT_VARIACOES)
+async def buscar_por_variacoes(request: Request, body: BuscarVariacoesRequest):
+    if len(re.sub(r"\D", "", body.cpf_parcial)) < 9:
+        raise HTTPException(status_code=422, detail="CPF parcial deve ter ao menos 9 dígitos")
+    candidates = _gerar_candidatos_variacoes(body.cpf_parcial)
+    if not candidates:
+        raise HTTPException(status_code=422, detail="Nenhum candidato válido gerado")
+    resultado = await run_in_threadpool(consultar_trt3_multiplos, candidates, body.nome, body.workers)
+    resultado["candidatos_gerados"] = len(candidates)
+    return resultado
+
+
+@router.post("/buscar-por-variacoes/stream", include_in_schema=False)
+@limiter.limit(_cfg.RATE_LIMIT_VARIACOES)
+async def buscar_por_variacoes_stream(request: Request, body: BuscarVariacoesRequest):
+    if len(re.sub(r"\D", "", body.cpf_parcial)) < 9:
+        raise HTTPException(status_code=422, detail="CPF parcial deve ter ao menos 9 dígitos")
+    candidates = _gerar_candidatos_variacoes(body.cpf_parcial)
     if not candidates:
         raise HTTPException(status_code=422, detail="Nenhum candidato válido gerado")
 
-    resultado = await run_in_threadpool(
-        consultar_trt3_multiplos, list(candidates), body.nome, body.workers
+    total = len(candidates)
+    loop = asyncio.get_running_loop()
+    q: asyncio.Queue = asyncio.Queue()
+
+    def on_progress(done: int, tot: int):
+        loop.call_soon_threadsafe(q.put_nowait, {"progress": done, "total": tot})
+
+    def run():
+        try:
+            result = consultar_trt3_multiplos(candidates, body.nome, body.workers, progress_cb=on_progress)
+            result["candidatos_gerados"] = total
+            loop.call_soon_threadsafe(q.put_nowait, {"done": True, "result": result})
+        except Exception as e:
+            loop.call_soon_threadsafe(q.put_nowait, {"error": str(e)})
+
+    threading.Thread(target=run, daemon=True).start()
+
+    async def event_stream():
+        yield f"data: {json.dumps({'total': total})}\n\n"
+        while True:
+            item = await q.get()
+            yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
+            if item.get("done") or item.get("error"):
+                break
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
-    resultado["candidatos_gerados"] = len(candidates)
-    return resultado

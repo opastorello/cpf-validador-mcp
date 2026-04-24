@@ -12,7 +12,10 @@ jobs:
     steps:
       - name: Aciona redeploy no Coolify
         run: |
-          STATUS=$(curl -sL -o /dev/null -w "%{http_code}" \
+          RESPONSE=$(curl -sL -w "\n%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_DEPLOY_TOKEN }}" \
-            "${{ secrets.COOLIFY_DEPLOY_WEBHOOK }}")
+            "${{ secrets.COOLIFY_DEPLOY_WEBHOOK }}&force=true")
+          STATUS=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "HTTP $STATUS: $BODY"
           [ "$STATUS" = "200" ] && echo "Deploy acionado com sucesso" || (echo "Falha: HTTP $STATUS" && exit 1)

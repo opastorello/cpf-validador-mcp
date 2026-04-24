@@ -460,6 +460,7 @@ _HTML = r"""<!DOCTYPE html>
           <p class="hint">Confirma se o CPF pertence a esta pessoa</p>
         </div>
         <button id="btn" onclick="verificar()">Verificar</button>
+        <button id="cancel-btn" onclick="cancelar()" style="display:none;margin-top:8px;width:100%;padding:10px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-size:14px">✕ Cancelar busca</button>
       </div>
 
       <div id="log-box" class="log-box" style="display:none">
@@ -566,7 +567,11 @@ _HTML = r"""<!DOCTYPE html>
     const AUTH_REQUIRED = __AUTH_REQUIRED__;
     const getToken = () => localStorage.getItem('api_token') || '';
     const authH = () => { const t = getToken(); return t ? {'Authorization': 'Bearer ' + t} : {}; };
-    const post  = (path, body) => fetch(path, { method:'POST', headers:{'Content-Type':'application/json', ...authH()}, body:JSON.stringify(body) });
+
+    let _abort = null;
+    const $cancelBtn = document.getElementById('cancel-btn');
+
+    function cancelar() { if (_abort) _abort.abort(); }
 
     /* ── main ── */
     async function verificar() {
@@ -574,8 +579,13 @@ _HTML = r"""<!DOCTYPE html>
       const nome = $nome.value.trim() || null;
       if (!cpf) { $cpf.focus(); return; }
 
+      _abort = new AbortController();
+      const {signal} = _abort;
+      const post = (path, body) => fetch(path, {method:'POST', signal, headers:{'Content-Type':'application/json',...authH()}, body:JSON.stringify(body)});
+
       $btn.disabled = true;
       $btn.innerHTML = '<span class="spin"></span>Verificando…';
+      $cancelBtn.style.display = 'block';
       $out.innerHTML = '';
       resetLog();
       startTimer();
@@ -620,7 +630,7 @@ _HTML = r"""<!DOCTYPE html>
           if (!totalCandidatos) throw new Error('Nenhuma variação válida encontrada para este CPF');
           doneStep(s2, `${totalCandidatos} variação${totalCandidatos!==1?'ões':'ão'} válida${totalCandidatos!==1?'s':''}`);
         } else {
-          doneStep(s2, hasMask ? `~${estimadoCandidatos} combinaç${estimadoCandidatos!=1?'ões':'ão'} a testar` : '1 CPF');
+          doneStep(s2, hasMask ? 'Calculando…' : '1 CPF');
         }
 
         /* 3 — conectar */
@@ -632,7 +642,7 @@ _HTML = r"""<!DOCTYPE html>
         const s4 = addStep(useVariations
           ? 'Testando CPF recalculado…'
           : hasMask
-          ? `Testando em paralelo… 0/${estimadoCandidatos}`
+          ? 'Aguardando contagem de candidatos…'
           : 'Resolvendo CAPTCHA…');
 
         let resultados = [];
@@ -654,24 +664,58 @@ _HTML = r"""<!DOCTYPE html>
             }
           }
           if (!found) {
-            s4.querySelector('span:last-child').textContent = `Expandindo para ${totalCandidatos} variações…`;
-            const res  = await post('/trt3/buscar-por-variacoes', {cpf_parcial: cpf, nome, workers: 8});
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || 'Erro na consulta de variações');
+            s4.querySelector('span:last-child').textContent = `Expandindo — 0/${totalCandidatos} variações…`;
+            const vresp = await fetch('/trt3/buscar-por-variacoes/stream', {
+              method: 'POST', signal,
+              headers: {'Content-Type': 'application/json', ...authH()},
+              body: JSON.stringify({cpf_parcial: cpf, nome, workers: 8}),
+            });
+            if (!vresp.ok) {
+              let msg = `Erro HTTP ${vresp.status}`;
+              try { const e = await vresp.json(); msg = e.detail || e.error || msg; } catch {}
+              const err = new Error(msg);
+              if (vresp.status === 429) err._retryAfter = parseInt(vresp.headers.get('Retry-After') || '60');
+              throw err;
+            }
+            const vreader = vresp.body.getReader();
+            const vdec = new TextDecoder();
+            let vbuf = '', vfinal = null;
+            vouter: while (true) {
+              const {done, value} = await vreader.read();
+              if (done) break;
+              vbuf += vdec.decode(value, {stream: true});
+              let boundary;
+              while ((boundary = vbuf.indexOf('\n\n')) !== -1) {
+                const chunk = vbuf.slice(0, boundary);
+                vbuf = vbuf.slice(boundary + 2);
+                if (!chunk.startsWith('data: ')) continue;
+                const evt = JSON.parse(chunk.slice(6));
+                if (evt.progress !== undefined) {
+                  s4.querySelector('span:last-child').textContent = `${evt.progress}/${evt.total} variações testadas…`;
+                } else if (evt.done) {
+                  vfinal = evt.result;
+                  break vouter;
+                } else if (evt.error) { throw new Error(evt.error); }
+              }
+            }
+            if (!vfinal) throw new Error('Stream de variações encerrado sem resultado');
             doneStep(s4, `${totalCandidatos} CAPTCHA${totalCandidatos!==1?'s':''} resolvido${totalCandidatos!==1?'s':''}`);
-            resultados = Object.values(data.matches || {});
+            resultados = Object.values(vfinal.matches || {});
           }
         } else if (hasMask) {
           const mascara = cpf.toUpperCase().replace(/X/g,'*');
           const resp = await fetch('/trt3/buscar-por-mascara/stream', {
             method: 'POST',
+            signal,
             headers: {'Content-Type': 'application/json', ...authH()},
             body: JSON.stringify({mascara, nome, workers: 8}),
           });
           if (!resp.ok) {
             let msg = `Erro HTTP ${resp.status}`;
             try { const e = await resp.json(); msg = e.detail || e.error || msg; } catch {}
-            throw new Error(msg);
+            const err = new Error(msg);
+            if (resp.status === 429) err._retryAfter = parseInt(resp.headers.get('Retry-After') || '60');
+            throw err;
           }
 
           const reader = resp.body.getReader();
@@ -785,8 +829,20 @@ _HTML = r"""<!DOCTYPE html>
       } catch(e) {
         stopTimer();
         $steps.querySelectorAll('.step:not(.done):not(.fail)').forEach(el => failStep(el, null));
-        $out.innerHTML = `<div class="err-box">⚠️ ${esc(e.message)}</div>`;
+        if (e.name === 'AbortError') {
+          $out.innerHTML = `<div class="err-box">Busca cancelada.</div>`;
+        } else if (e._retryAfter) {
+          let rem = e._retryAfter;
+          const tick = () => {
+            $out.innerHTML = `<div class="err-box">⚠️ Rate limit — nova busca em ${rem}s.</div>`;
+            if (--rem >= 0) setTimeout(tick, 1000);
+          };
+          tick();
+        } else {
+          $out.innerHTML = `<div class="err-box">⚠️ ${esc(e.message)}</div>`;
+        }
       } finally {
+        $cancelBtn.style.display = 'none';
         $btn.disabled = false;
         $btn.textContent = 'Verificar';
       }
@@ -932,7 +988,7 @@ _HTML = r"""<!DOCTYPE html>
     function nomeMatch(a, b) {
       const n = s => s.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
       const na = n(a), nb = n(b);
-      return na === nb || nb.split(/\s+/).every(w => na.includes(w));
+      return na === nb || nb.split(/\s+/).every(w => new RegExp('(?:^|\\s)' + w + '(?:\\s|$)').test(na));
     }
 
     function row(l, v) {
