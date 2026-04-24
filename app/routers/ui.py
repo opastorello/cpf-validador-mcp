@@ -603,6 +603,7 @@ _HTML = r"""<!DOCTYPE html>
         }
 
         /* 2 — candidatos */
+        let totalCandidatos = 1;
         const estimadoCandidatos = hasMask ? Math.pow(10, xs) : 1;
         const s2 = addStep(useVariations
           ? 'Calculando variações válidas…'
@@ -610,8 +611,15 @@ _HTML = r"""<!DOCTYPE html>
           ? `Calculando combinações para ${xs} dígito${xs>1?'s':''} desconhecido${xs>1?'s':''}…`
           : 'Preparando consulta…');
         await delay(300);
-        if (!useVariations)
+        if (useVariations) {
+          const vrResp = await post('/cpf/variations', {cpf});
+          const vrData = await vrResp.json();
+          totalCandidatos = (vrData.variations || []).length;
+          if (!totalCandidatos) throw new Error('Nenhuma variação válida encontrada para este CPF');
+          doneStep(s2, `${totalCandidatos} variação${totalCandidatos!==1?'ões':'ão'} válida${totalCandidatos!==1?'s':''}`);
+        } else {
           doneStep(s2, hasMask ? `~${estimadoCandidatos} combinaç${estimadoCandidatos!=1?'ões':'ão'} a testar` : '1 CPF');
+        }
 
         /* 3 — conectar */
         const s3 = addStep('Conectando ao servidor…');
@@ -626,14 +634,11 @@ _HTML = r"""<!DOCTYPE html>
           : 'Resolvendo CAPTCHA…');
 
         let resultados = [];
-        let totalCandidatos = 1;
 
         if (useVariations) {
           const res  = await post('/trt3/buscar-por-variacoes', {cpf_parcial: cpf, nome, workers: 8});
           const data = await res.json();
-          if (!res.ok) throw new Error(data.detail || 'Nenhuma variação válida encontrada');
-          totalCandidatos = data.candidatos_gerados || 0;
-          doneStep(s2, `${totalCandidatos} variação${totalCandidatos!==1?'ões':'ão'} válida${totalCandidatos!==1?'s':''}`);
+          if (!res.ok) throw new Error(data.detail || 'Erro na consulta de variações');
           doneStep(s4, `${totalCandidatos} CAPTCHA${totalCandidatos!==1?'s':''} resolvido${totalCandidatos!==1?'s':''}`);
           resultados = Object.values(data.matches || {});
         } else if (hasMask) {
