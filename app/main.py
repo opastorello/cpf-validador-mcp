@@ -3,6 +3,7 @@ from fastapi.openapi.utils import get_openapi
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from prometheus_fastapi_instrumentator import Instrumentator
 from app.routers import cpf, trt3, ui, history
 from app.mcp_server import mcp
 from app.auth import TokenMiddleware
@@ -67,6 +68,8 @@ app.include_router(ui.router)
 app.include_router(history.router)
 app.include_router(cpf.router)
 app.include_router(trt3.router)
+
+Instrumentator().instrument(app).expose(app, include_in_schema=False)
 
 # Mount FastMCP last — catch-all at "/"
 app.mount("/", _mcp_app)
