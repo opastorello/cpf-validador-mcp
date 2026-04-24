@@ -178,12 +178,13 @@ def consultar_trt3(cpf_limpo: str) -> dict:
     return _consultar_trt3_interno(cpf_limpo)
 
 
-def consultar_trt3_multiplos(cpfs: list[str], nome_filtro: str | None = None, workers: int | None = None) -> dict:
+def consultar_trt3_multiplos(cpfs: list[str], nome_filtro: str | None = None, workers: int | None = None, progress_cb=None) -> dict:
     from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeout
 
     n_workers = max(1, min(workers if workers is not None else _cfg.DEFAULT_WORKERS, _cfg.MAX_WORKERS))
 
     resultados = {}
+    completed = 0
     with ThreadPoolExecutor(max_workers=n_workers) as executor:
         futures = {executor.submit(_consultar_trt3_interno, cpf): cpf for cpf in cpfs}
         for future in as_completed(futures):
@@ -194,6 +195,9 @@ def consultar_trt3_multiplos(cpfs: list[str], nome_filtro: str | None = None, wo
                 resultados[cpf] = {"cpf": _formatar(cpf), "encontrado": None, "erro": f"Timeout após {_cfg.TASK_TIMEOUT}s"}
             except Exception as e:
                 resultados[cpf] = {"cpf": _formatar(cpf), "encontrado": None, "erro": str(e)}
+            completed += 1
+            if progress_cb:
+                progress_cb(completed, len(cpfs))
 
     if nome_filtro:
         filtro = nome_filtro.lower()

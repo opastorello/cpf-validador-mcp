@@ -1,6 +1,10 @@
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+import asyncio
+import json
 import re
+import threading
 from starlette.concurrency import run_in_threadpool
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -153,6 +157,53 @@ async def buscar_por_mascara(request: Request, body: BuscarMascaraRequest):
     )
     resultado["candidatos_gerados"] = len(candidates)
     return resultado
+
+
+@router.post(
+    "/buscar-por-mascara/stream",
+    summary="Busca CPF por máscara com progresso em tempo real (SSE)",
+    include_in_schema=False,
+)
+@limiter.limit(_cfg.RATE_LIMIT_MASK)
+async def buscar_por_mascara_stream(request: Request, body: BuscarMascaraRequest):
+    try:
+        candidates = gerar_cpfs_de_mascara(body.mascara)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    if not candidates:
+        raise HTTPException(status_code=422, detail="Nenhum CPF válido gerado pela máscara")
+
+    total = len(candidates)
+    loop = asyncio.get_running_loop()
+    q: asyncio.Queue = asyncio.Queue()
+
+    def on_progress(done: int, tot: int):
+        loop.call_soon_threadsafe(q.put_nowait, {"progress": done, "total": tot})
+
+    def run():
+        try:
+            result = consultar_trt3_multiplos(candidates, body.nome, body.workers, progress_cb=on_progress)
+            result["candidatos_gerados"] = total
+            loop.call_soon_threadsafe(q.put_nowait, {"done": True, "result": result})
+        except Exception as e:
+            loop.call_soon_threadsafe(q.put_nowait, {"error": str(e)})
+
+    threading.Thread(target=run, daemon=True).start()
+
+    async def event_stream():
+        yield f"data: {json.dumps({'total': total})}\n\n"
+        while True:
+            item = await q.get()
+            yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
+            if item.get("done") or item.get("error"):
+                break
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post(

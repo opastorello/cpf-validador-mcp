@@ -244,13 +244,15 @@ _HTML = r"""<!DOCTYPE html>
 
     .result-head {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
+      gap: 12px;
       padding: 15px 18px 12px;
       border-bottom: 1px solid var(--border);
     }
 
-    .result-name { font-weight: 700; font-size: 16px; }
+    .result-name { font-weight: 700; font-size: 16px; flex: 1; min-width: 0; }
+    .result-indicator { white-space: nowrap; flex-shrink: 0; padding-top: 2px; }
 
     .result-body { padding: 4px 18px 14px; }
 
@@ -614,7 +616,7 @@ _HTML = r"""<!DOCTYPE html>
 
         /* 4 — captcha (fetch real) */
         const s4 = addStep(hasMask
-          ? `Testando ~${estimadoCandidatos} candidato${estimadoCandidatos!=1?'s':''} em paralelo…`
+          ? `Testando em paralelo… 0/${estimadoCandidatos}`
           : 'Resolvendo CAPTCHA…');
 
         let resultados = [];
@@ -622,13 +624,49 @@ _HTML = r"""<!DOCTYPE html>
 
         if (hasMask) {
           const mascara = cpf.toUpperCase().replace(/X/g,'*');
-          const res  = await post('/trt3/buscar-por-mascara', {mascara, nome, workers:8});
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.detail || 'Erro na consulta');
-          totalCandidatos = data.candidatos_gerados || '?';
+          const resp = await fetch('/trt3/buscar-por-mascara/stream', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', ...authH()},
+            body: JSON.stringify({mascara, nome, workers: 8}),
+          });
+          if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Erro na consulta'); }
+
+          const reader = resp.body.getReader();
+          const dec = new TextDecoder();
+          let buf = '';
+          let finalData = null;
+
+          outer: while (true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, {stream: true});
+            let boundary;
+            while ((boundary = buf.indexOf('\n\n')) !== -1) {
+              const chunk = buf.slice(0, boundary);
+              buf = buf.slice(boundary + 2);
+              if (!chunk.startsWith('data: ')) continue;
+              const evt = JSON.parse(chunk.slice(6));
+              if (evt.total && evt.progress === undefined && !evt.done) {
+                s2.querySelector('span:last-child').textContent =
+                  `${evt.total} combinaç${evt.total!=1?'ões':'ão'} calculada${evt.total!=1?'s':''}`;
+                s4.querySelector('span:last-child').textContent = `Testando em paralelo… 0/${evt.total}`;
+              } else if (evt.progress !== undefined) {
+                s4.querySelector('span:last-child').textContent =
+                  `Testando em paralelo… ${evt.progress}/${evt.total}`;
+              } else if (evt.done) {
+                finalData = evt.result;
+                break outer;
+              } else if (evt.error) {
+                throw new Error(evt.error);
+              }
+            }
+          }
+
+          if (!finalData) throw new Error('Stream encerrado sem resultado');
+          totalCandidatos = finalData.candidatos_gerados || '?';
           s2.querySelector('span:last-child').textContent = `${totalCandidatos} combinaç${totalCandidatos!=1?'ões':'ão'} calculada${totalCandidatos!=1?'s':''}`;
           doneStep(s4, `${totalCandidatos} CAPTCHA${totalCandidatos!=1?'s':''} resolvido${totalCandidatos!=1?'s':''}`);
-          resultados = Object.values(data.matches || {});
+          resultados = Object.values(finalData.matches || {});
         } else {
           const res  = await post('/trt3/feitos', {cpf});
           const data = await res.json();
@@ -650,9 +688,9 @@ _HTML = r"""<!DOCTYPE html>
           const bate     = nome ? nomeMatch(nomeReal, nome) : null;
 
           const indicator = bate === true
-            ? `<span style="color:#3fb950;font-weight:500;font-size:13px">✓ Confirmado</span>`
+            ? `<span class="result-indicator" style="color:#3fb950;font-weight:500;font-size:13px">✓ Confirmado</span>`
             : bate === false
-            ? `<span style="color:#f0883e;font-weight:600;font-size:13px">✕ Nome não bate</span>`
+            ? `<span class="result-indicator" style="color:#f0883e;font-weight:600;font-size:13px">✕ Nome não bate</span>`
             : '';
 
           const pdfLink = d.pdf_url
