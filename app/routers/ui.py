@@ -588,26 +588,30 @@ _HTML = r"""<!DOCTYPE html>
         const s1 = addStep('Validando CPF…');
         await delay(250);
 
+        let useVariations = false;
+
         if (!hasMask) {
           const vd = await (await post('/cpf/validate', {cpf})).json();
           if (!vd.valido) {
-            failStep(s1, `CPF inválido — ${vd.mensagem || vd.detail || 'dígitos incorretos'}`);
-            stopTimer();
-            $out.innerHTML = `<div class="err-box">✕ CPF matematicamente inválido — verifique os dígitos.</div>`;
-            return;
+            useVariations = true;
+            doneStep(s1, 'CPF inválido — buscando correções automaticamente…');
+          } else {
+            doneStep(s1, `CPF válido — ${vd.cpf_formatado}`);
           }
-          doneStep(s1, `CPF válido — ${vd.cpf_formatado}`);
         } else {
           doneStep(s1, `Máscara: ${xs} dígito${xs>1?'s':''} desconhecido${xs>1?'s':''}`);
         }
 
         /* 2 — candidatos */
         const estimadoCandidatos = hasMask ? Math.pow(10, xs) : 1;
-        const s2 = addStep(hasMask
+        const s2 = addStep(useVariations
+          ? 'Calculando variações válidas…'
+          : hasMask
           ? `Calculando combinações para ${xs} dígito${xs>1?'s':''} desconhecido${xs>1?'s':''}…`
           : 'Preparando consulta…');
         await delay(300);
-        doneStep(s2, hasMask ? `~${estimadoCandidatos} combinaç${estimadoCandidatos!=1?'ões':'ão'} a testar` : '1 CPF');
+        if (!useVariations)
+          doneStep(s2, hasMask ? `~${estimadoCandidatos} combinaç${estimadoCandidatos!=1?'ões':'ão'} a testar` : '1 CPF');
 
         /* 3 — conectar */
         const s3 = addStep('Conectando ao servidor…');
@@ -615,14 +619,24 @@ _HTML = r"""<!DOCTYPE html>
         doneStep(s3, 'Conexão estabelecida');
 
         /* 4 — captcha (fetch real) */
-        const s4 = addStep(hasMask
+        const s4 = addStep(useVariations
+          ? 'Consultando variações no TRT3…'
+          : hasMask
           ? `Testando em paralelo… 0/${estimadoCandidatos}`
           : 'Resolvendo CAPTCHA…');
 
         let resultados = [];
         let totalCandidatos = 1;
 
-        if (hasMask) {
+        if (useVariations) {
+          const res  = await post('/trt3/buscar-por-variacoes', {cpf_parcial: cpf, nome, workers: 8});
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || 'Nenhuma variação válida encontrada');
+          totalCandidatos = data.candidatos_gerados || 0;
+          doneStep(s2, `${totalCandidatos} variação${totalCandidatos!==1?'ões':'ão'} válida${totalCandidatos!==1?'s':''}`);
+          doneStep(s4, `${totalCandidatos} CAPTCHA${totalCandidatos!==1?'s':''} resolvido${totalCandidatos!==1?'s':''}`);
+          resultados = Object.values(data.matches || {});
+        } else if (hasMask) {
           const mascara = cpf.toUpperCase().replace(/X/g,'*');
           const resp = await fetch('/trt3/buscar-por-mascara/stream', {
             method: 'POST',
@@ -678,7 +692,7 @@ _HTML = r"""<!DOCTYPE html>
         stopTimer();
 
         if (!resultados.length) {
-          $out.innerHTML = `<div class="err-box">⚠️ Nenhum resultado encontrado${nome ? ` para "${esc(nome)}"` : ''}${hasMask ? ` — ${esc(String(totalCandidatos))} candidatos testados` : ''}.</div>`;
+          $out.innerHTML = `<div class="err-box">⚠️ Nenhum resultado encontrado${nome ? ` para "${esc(nome)}"` : ''}${(hasMask || useVariations) ? ` — ${esc(String(totalCandidatos))} candidatos testados` : ''}.</div>`;
           return;
         }
 
@@ -719,7 +733,7 @@ _HTML = r"""<!DOCTYPE html>
         resultados.forEach(d => {
           if (d.nome_certidao) saveToHistory(d.cpf || cpf, d.nome_certidao, d.numero_certidao || null, duracaoS || null);
         });
-        if (hasMask && resultados.length > 1) {
+        if ((hasMask || useVariations) && resultados.length > 1) {
           $out.innerHTML += `<div class="meta">${resultados.length} resultados encontrados · ${totalCandidatos} candidatos testados · ${$el.textContent}</div>`;
         }
 
