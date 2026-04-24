@@ -66,13 +66,20 @@ def gerar_cpfs_de_mascara(mascara: str) -> list[str]:
             f"máximo permitido é {_cfg.MAX_WILDCARDS_IN_MASK} (~{limit:,} combinações)"
         )
 
+    check_template = chars[9:]  # dígitos verificadores especificados pelo usuário
+
     candidates = []
     for combo in _product("0123456789", repeat=len(wildcard_positions)):
         base = list(base_template)
         for pos, digit in zip(wildcard_positions, combo):
             base[pos] = digit
         base9 = "".join(base)
-        cpf11 = base9 + calcular_digitos(base9)
+        digits = calcular_digitos(base9)
+        if check_template[0] != "*" and check_template[0] != digits[0]:
+            continue
+        if check_template[1] != "*" and check_template[1] != digits[1]:
+            continue
+        cpf11 = base9 + digits
         if is_valido(cpf11):
             candidates.append(cpf11)
 
