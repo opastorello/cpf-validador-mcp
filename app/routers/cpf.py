@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from app.services.cpf import validate_cpf, generate_valid_variations
+from app import metrics as _m
 
 
 class CpfRequest(BaseModel):
@@ -25,9 +26,12 @@ router = APIRouter(prefix="/cpf", tags=["cpf"])
 def validate(body: CpfRequest):
     result = validate_cpf(body.cpf)
     if not result.get("cpf_numeros") or len(result["cpf_numeros"]) != 11:
+        _m.cpf_validations_total.labels(result="invalid").inc()
         raise HTTPException(status_code=422, detail=result.get("mensagem", "CPF inválido"))
     if not result.get("valido"):
+        _m.cpf_validations_total.labels(result="invalid").inc()
         raise HTTPException(status_code=422, detail=result.get("mensagem", "CPF inválido"))
+    _m.cpf_validations_total.labels(result="valid").inc()
     return result
 
 
@@ -53,4 +57,5 @@ def variations(body: CpfRequest):
     result = generate_valid_variations(body.cpf)
     if "error" in result:
         raise HTTPException(status_code=422, detail=result["error"])
+    _m.cpf_variations_generated_total.inc(result["total_variacoes"])
     return result

@@ -11,8 +11,8 @@ load_dotenv()
 _TOKEN = os.getenv("API_TOKEN", "").strip()
 _ENV = os.getenv("ENV", "development").strip().lower()
 
-# Em produção, apenas "/" é acessível sem token via web
-# Em desenvolvimento, /docs, /redoc, /openapi.json e /health também ficam abertos
+# "/" e "/health" são sempre acessíveis sem token (qualquer ambiente)
+# Em desenvolvimento, /docs, /redoc, /openapi.json também ficam abertos
 _OPEN_PATHS_ALWAYS = {"/", "/health", "/metrics"}
 _OPEN_PATHS_DEV = {"/docs", "/redoc", "/openapi.json"}
 

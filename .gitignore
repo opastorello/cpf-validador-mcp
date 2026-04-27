@@ -24,4 +24,5 @@ build/
 # Claude Code local
 .claude/
 *.bat
+claude_debug.log
 

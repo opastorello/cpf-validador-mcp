@@ -4,6 +4,7 @@ Testes da API REST — todos os chamados ao TRT3 são mockados.
 from unittest.mock import patch
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 
@@ -13,7 +14,16 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture(scope="module")
 def client():
+    from contextlib import asynccontextmanager
+    import app.auth as _auth
+    _auth._TOKEN = ""  # garante que o client de teste roda sem autenticação
     from app.main import app
+
+    @asynccontextmanager
+    async def _noop_lifespan(_app):
+        yield
+
+    app.router.lifespan_context = _noop_lifespan
     return TestClient(app, raise_server_exceptions=True)
 
 
@@ -92,3 +102,53 @@ def test_trt3_feitos_sucesso(client):
 def test_trt3_feitos_payload_invalido(client):
     r = client.post("/trt3/feitos", json={})
     assert r.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Auth middleware
+# ---------------------------------------------------------------------------
+
+def test_auth_sem_api_token_configurado(client):
+    """Sem API_TOKEN no ambiente — todas as rotas são livres."""
+    r = client.get("/health")
+    assert r.status_code == 200
+
+    r = client.post("/cpf/validate", json={"cpf": "111.444.777-35"})
+    assert r.status_code == 200
+
+
+def test_auth_com_api_token(monkeypatch):
+    """Com API_TOKEN definido — exige Bearer token correto."""
+    import app.auth as _auth
+    monkeypatch.setattr(_auth, "_TOKEN", "test-secret")
+
+    from app.auth import TokenMiddleware
+    from app.routers import cpf
+
+    test_app = FastAPI()
+    test_app.add_middleware(TokenMiddleware)
+    test_app.include_router(cpf.router)
+
+    @test_app.get("/health")
+    async def health():
+        return {"status": "ok"}
+
+    with TestClient(test_app) as c:
+        # health sempre público
+        assert c.get("/health").status_code == 200
+
+        # sem token → 401
+        r = c.post("/cpf/validate", json={"cpf": "111.444.777-35"})
+        assert r.status_code == 401
+
+        # token errado → 401
+        r = c.post("/cpf/validate",
+                   json={"cpf": "111.444.777-35"},
+                   headers={"Authorization": "Bearer errado"})
+        assert r.status_code == 401
+
+        # token correto → passa para o handler
+        r = c.post("/cpf/validate",
+                   json={"cpf": "111.444.777-35"},
+                   headers={"Authorization": "Bearer test-secret"})
+        assert r.status_code == 200

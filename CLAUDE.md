@@ -11,7 +11,7 @@ pip install -r requirements.txt
 # Rodar localmente (FastAPI + FastMCP na porta 8000)
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-# Docker (porta 8002 conforme docker-compose.yml)
+# Docker (porta 8002 conforme docker-compose.yaml)
 docker compose up --build -d
 docker compose down
 ```

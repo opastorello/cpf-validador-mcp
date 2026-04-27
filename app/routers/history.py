@@ -8,6 +8,7 @@ from fastapi import APIRouter, Path
 from pydantic import BaseModel, Field
 
 from app import config as _cfg
+from app import metrics as _m
 
 router = APIRouter(prefix="/history", tags=["history"])
 
@@ -76,6 +77,7 @@ def save(entry: SaveRequest):
                 data[key]["numero_certidao"] = entry.numero_certidao
             if entry.duracao_segundos is not None:
                 data[key]["ultima_duracao_s"] = round(entry.duracao_segundos, 1)
+            _m.history_saves_total.labels(action="update").inc()
         else:
             data[key] = {
                 "cpf": entry.cpf,
@@ -86,7 +88,9 @@ def save(entry: SaveRequest):
                 "ultima_consulta": now,
                 "ultima_duracao_s": round(entry.duracao_segundos, 1) if entry.duracao_segundos else None,
             }
+            _m.history_saves_total.labels(action="new").inc()
         _persist(data)
+        _m.history_entries_current.set(len(data))
     return {"ok": True}
 
 
@@ -112,6 +116,7 @@ def get_all():
 def clear_all():
     with _lock:
         _persist({})
+        _m.history_entries_current.set(0)
     return {"ok": True}
 
 
@@ -129,4 +134,5 @@ def delete_entry(
         data = _load()
         data.pop(key, None)
         _persist(data)
+        _m.history_entries_current.set(len(data))
     return {"ok": True}

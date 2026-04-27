@@ -11,6 +11,7 @@ from slowapi.util import get_remote_address
 from app.services.cpf import is_valido, formatar, gerar_cpfs_de_mascara
 from app.services.trt3 import consultar_trt3, consultar_trt3_multiplos
 from app import config as _cfg
+from app import metrics as _m
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -126,6 +127,8 @@ async def feitos_multiplos(request: Request, body: FeitosMultiplosRequest):
     if not cpfs_validos:
         return {"total": len(body.cpfs), "erros": erros, "resultados": {}, "matches": {}}
 
+    _m.cpf_bulk_queries_total.inc()
+    _m.cpf_bulk_size.observe(len(cpfs_validos))
     resultado = await run_in_threadpool(consultar_trt3_multiplos, cpfs_validos, None, body.workers)
     resultado["erros"] = erros
     return resultado
@@ -152,6 +155,8 @@ async def buscar_por_mascara(request: Request, body: BuscarMascaraRequest):
     if not candidates:
         raise HTTPException(status_code=422, detail="Nenhum CPF válido gerado pela máscara")
 
+    _m.cpf_mask_searches_total.inc()
+    _m.cpf_mask_candidates_total.inc(len(candidates))
     resultado = await run_in_threadpool(
         consultar_trt3_multiplos, candidates, body.nome, body.workers
     )
@@ -173,6 +178,9 @@ async def buscar_por_mascara_stream(request: Request, body: BuscarMascaraRequest
 
     if not candidates:
         raise HTTPException(status_code=422, detail="Nenhum CPF válido gerado pela máscara")
+
+    _m.cpf_mask_searches_total.inc()
+    _m.cpf_mask_candidates_total.inc(len(candidates))
 
     total = len(candidates)
     loop = asyncio.get_running_loop()
@@ -254,6 +262,8 @@ async def buscar_por_variacoes(request: Request, body: BuscarVariacoesRequest):
     candidates = _gerar_candidatos_variacoes(body.cpf_parcial)
     if not candidates:
         raise HTTPException(status_code=422, detail="Nenhum candidato válido gerado")
+    _m.cpf_variation_searches_total.inc()
+    _m.cpf_variation_candidates_total.inc(len(candidates))
     resultado = await run_in_threadpool(consultar_trt3_multiplos, candidates, body.nome, body.workers)
     resultado["candidatos_gerados"] = len(candidates)
     return resultado
@@ -267,6 +277,8 @@ async def buscar_por_variacoes_stream(request: Request, body: BuscarVariacoesReq
     candidates = _gerar_candidatos_variacoes(body.cpf_parcial)
     if not candidates:
         raise HTTPException(status_code=422, detail="Nenhum candidato válido gerado")
+    _m.cpf_variation_searches_total.inc()
+    _m.cpf_variation_candidates_total.inc(len(candidates))
 
     total = len(candidates)
     loop = asyncio.get_running_loop()

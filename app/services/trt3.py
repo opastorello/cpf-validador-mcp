@@ -6,6 +6,7 @@ from pypdf import PdfReader
 from curl_cffi import requests as _requests
 from app.captcha.predictor import predict as _solve_captcha
 from app import config as _cfg
+from app import metrics as _m
 
 _TRT3_BASE = _cfg.TRT3_BASE_URL
 _TRT3_URL = f"{_TRT3_BASE}{_cfg.TRT3_FORM_PATH}"
@@ -126,30 +127,64 @@ def _parse_html_resultado(cpf_limpo, cpf_fmt, resp) -> dict:
 
 def _consultar_trt3_interno(cpf_limpo: str) -> dict:
     cpf_fmt = _formatar(cpf_limpo)
-    with _TRT3_SEMAPHORE:
-        return _consultar_trt3_com_sessao(cpf_limpo, cpf_fmt)
+    _m.trt3_concurrent_queries.inc()
+    try:
+        with _TRT3_SEMAPHORE:
+            return _consultar_trt3_com_sessao(cpf_limpo, cpf_fmt)
+    finally:
+        _m.trt3_concurrent_queries.dec()
 
 
 def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
     session = _requests.Session(impersonate="chrome124")
+    attempts = 0
+
+    t_query_start = time.time()
 
     for attempt in range(_cfg.MAX_CAPTCHA_ATTEMPTS):
         try:
             action_url, viewstate, captcha_url = _fetch_page(session)
 
             if not captcha_url:
+                _m.trt3_queries_total.labels(result="error").inc()
+                _m.trt3_captcha_retries_per_query.observe(attempts)
+                _m.trt3_query_duration_seconds.observe(time.time() - t_query_start)
                 return {"cpf": cpf_fmt, "encontrado": None, "erro": "CAPTCHA URL não encontrada."}
 
-            captcha_resp = session.get(captcha_url, headers=_HEADERS, timeout=_cfg.CAPTCHA_TIMEOUT)
-            captcha_resp.raise_for_status()
-            captcha_text = _solve_captcha(captcha_resp.content).strip()
+            _m.trt3_captcha_attempts_total.inc()
+            attempts += 1
 
-            resp = _post_form(session, action_url, viewstate, cpf_fmt, captcha_text)
-            resp.raise_for_status()
+            t_captcha = time.time()
+            try:
+                captcha_resp = session.get(captcha_url, headers=_HEADERS, timeout=_cfg.CAPTCHA_TIMEOUT)
+                captcha_resp.raise_for_status()
+            except Exception as exc:
+                err_type = "timeout" if "timeout" in str(exc).lower() else "connection"
+                _m.trt3_http_errors_total.labels(type=err_type).inc()
+                raise
+            captcha_text = _solve_captcha(captcha_resp.content).strip()
+            _m.trt3_captcha_duration_seconds.observe(time.time() - t_captcha)
+
+            try:
+                resp = _post_form(session, action_url, viewstate, cpf_fmt, captcha_text)
+                resp.raise_for_status()
+            except Exception as exc:
+                err_type = "timeout" if "timeout" in str(exc).lower() else "http_status"
+                _m.trt3_http_errors_total.labels(type=err_type).inc()
+                raise
 
             content_type = resp.headers.get("Content-Type", "")
             if "application/pdf" in content_type or "octet-stream" in content_type:
-                dados = _extrair_dados_pdf(resp.content)
+                _m.trt3_captcha_result_total.labels(result="success").inc()
+                try:
+                    dados = _extrair_dados_pdf(resp.content)
+                    _m.trt3_pdf_parsed_total.labels(result="success").inc()
+                except Exception:
+                    _m.trt3_pdf_parsed_total.labels(result="error").inc()
+                    dados = {}
+                _m.trt3_captcha_retries_per_query.observe(attempts)
+                _m.trt3_queries_total.labels(result="found").inc()
+                _m.trt3_query_duration_seconds.observe(time.time() - t_query_start)
                 return {"cpf": cpf_fmt, "encontrado": True, **dados}
 
             # CAPTCHA errado: TRT3 devolve o formulário — próxima iteração busca página fresca
@@ -158,10 +193,13 @@ def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
                 resp.text, re.IGNORECASE,
             ) or "form:verifyCaptcha_" in resp.text
             if captcha_invalido:
+                _m.trt3_captcha_result_total.labels(result="wrong").inc()
+                _m.trt3_session_resets_total.labels(reason="wrong_captcha").inc()
                 session = _requests.Session(impersonate="chrome124")
                 time.sleep(_cfg.RETRY_DELAY)
                 continue
 
+            _m.trt3_captcha_result_total.labels(result="success").inc()
             result = _parse_html_resultado(cpf_limpo, cpf_fmt, resp)
 
             if result.get("pdf_url"):
@@ -170,16 +208,27 @@ def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
                     pdf_resp.raise_for_status()
                     pdf_data = _extrair_dados_pdf(pdf_resp.content)
                     result.update(pdf_data)
+                    _m.trt3_pdf_parsed_total.labels(result="success").inc()
                 except Exception:
-                    pass
+                    _m.trt3_pdf_parsed_total.labels(result="error").inc()
 
+            _m.trt3_captcha_retries_per_query.observe(attempts)
+            found = result.get("encontrado")
+            label = "found" if found is True else "not_found" if found is False else "indeterminate"
+            _m.trt3_queries_total.labels(result=label).inc()
+            _m.trt3_query_duration_seconds.observe(time.time() - t_query_start)
             return result
 
         except Exception:
+            _m.trt3_captcha_result_total.labels(result="error").inc()
+            _m.trt3_session_resets_total.labels(reason="exception").inc()
             session = _requests.Session(impersonate="chrome124")
             time.sleep(_cfg.RETRY_DELAY)
             continue
 
+    _m.trt3_captcha_retries_per_query.observe(attempts)
+    _m.trt3_queries_total.labels(result="error").inc()
+    _m.trt3_query_duration_seconds.observe(time.time() - t_query_start)
     return {"cpf": cpf_fmt, "encontrado": None, "erro": f"CAPTCHA não resolvido após {_cfg.MAX_CAPTCHA_ATTEMPTS} tentativas."}
 
 
