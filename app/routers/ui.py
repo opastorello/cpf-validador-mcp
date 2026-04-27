@@ -994,7 +994,7 @@ _HTML = r"""<!DOCTYPE html>
       btn.disabled = true;
       btn.textContent = 'Validando…';
       try {
-        const res = await fetch('/history/', { headers: { 'Authorization': 'Bearer ' + tok } });
+        const res = await fetch('/health', { headers: { 'Authorization': 'Bearer ' + tok } });
         if (res.status === 401) {
           showGateMsg('✕ Token inválido.', 'var(--err-text)');
           btn.disabled = false; btn.textContent = 'Entrar';
@@ -1034,38 +1034,41 @@ _HTML = r"""<!DOCTYPE html>
       switchTabRaw(name);
     }
 
-    /* ── history (server-side) ── */
+    /* ── history (localStorage — por browser/usuário) ── */
     const $histList = document.getElementById('hist-list');
+    const HIST_KEY = 'cpf_validador_history';
 
     const isHistoryEnabled = () => localStorage.getItem('history_enabled') !== 'false';
+    function setHistoryEnabled(val) { localStorage.setItem('history_enabled', val ? 'true' : 'false'); }
+    function initHistoryToggle() { document.getElementById('toggle-hist').checked = isHistoryEnabled(); }
 
-    function setHistoryEnabled(val) {
-      localStorage.setItem('history_enabled', val ? 'true' : 'false');
-    }
+    function histLoad() { try { return JSON.parse(localStorage.getItem(HIST_KEY) || '{}'); } catch { return {}; } }
+    function histSave(d) { localStorage.setItem(HIST_KEY, JSON.stringify(d)); }
 
-    function initHistoryToggle() {
-      document.getElementById('toggle-hist').checked = isHistoryEnabled();
-    }
-
-    async function saveToHistory(cpf, nome, numero_certidao, duracao_segundos) {
+    function saveToHistory(cpf, nome, numero_certidao, duracao_segundos) {
       if (!isHistoryEnabled()) return;
-      await fetch('/history/save', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json', ...authH()},
-        body: JSON.stringify({ cpf, nome, numero_certidao, duracao_segundos })
-      }).catch(() => {});
+      const data = histLoad();
+      const key  = cpf;
+      const now  = new Date().toISOString();
+      if (data[key]) {
+        data[key].consultas++;
+        data[key].ultima_consulta = now;
+        if (nome) data[key].nome = nome;
+        if (numero_certidao) data[key].numero_certidao = numero_certidao;
+        if (duracao_segundos != null) data[key].ultima_duracao_s = Math.round(duracao_segundos * 10) / 10;
+      } else {
+        data[key] = { cpf: key, nome, numero_certidao, consultas: 1,
+          primeira_consulta: now, ultima_consulta: now,
+          ultima_duracao_s: duracao_segundos != null ? Math.round(duracao_segundos * 10) / 10 : null };
+      }
+      histSave(data);
     }
 
-    async function clearHistory() {
-      await fetch('/history/', { method: 'DELETE', headers: {...authH()} }).catch(() => {});
-      renderHistory();
-    }
+    function clearHistory() { localStorage.removeItem(HIST_KEY); renderHistory(); }
 
-    async function downloadHistCSV() {
-      const res = await fetch('/history/', {headers: {...authH()}}).catch(() => null);
-      if (!res || !res.ok) return;
-      const data = await res.json();
-      const entries = data.entries || [];
+    function downloadHistCSV() {
+      const data = histLoad();
+      const entries = Object.values(data);
       if (!entries.length) return;
       const hdr = ['Nome','CPF','Nº Certidão','Consultas','Última consulta','Duração (s)'];
       const rows = entries.map(h => [h.nome||'',h.cpf||'',h.numero_certidao||'',h.consultas||'',h.ultima_consulta||'',h.ultima_duracao_s||'']);
@@ -1077,8 +1080,10 @@ _HTML = r"""<!DOCTYPE html>
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
 
-    async function deleteHistoryEntry(cpf) {
-      await fetch('/history/' + encodeURIComponent(cpf), { method: 'DELETE', headers: {...authH()} }).catch(() => {});
+    function deleteHistoryEntry(cpf) {
+      const data = histLoad();
+      delete data[cpf];
+      histSave(data);
       renderHistory();
     }
 
@@ -1091,36 +1096,31 @@ _HTML = r"""<!DOCTYPE html>
       return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) + ' ' + hm;
     }
 
-    async function renderHistory() {
-      $histList.innerHTML = '<div class="hist-empty">Carregando…</div>';
-      try {
-        const res  = await fetch('/history/', { headers: {...authH()} });
-        const data = await res.json();
-        const entries = data.entries || [];
-        if (!entries.length) {
-          $histList.innerHTML = '<div class="hist-empty">Nenhuma consulta registrada ainda.</div>';
-          return;
-        }
-        $histList.innerHTML = entries.map(h => `
-          <div class="hist-item" onclick="fillFromHistory('${esc(h.cpf)}','${esc(h.nome||'')}')">
-            <div style="flex:1;min-width:0">
-              <div class="hist-nome">${esc(h.nome) || '—'}</div>
-              <div style="font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap">
-                <span>${esc(h.cpf)}</span>
-                ${h.numero_certidao ? `<span>Certidão ${esc(h.numero_certidao)}</span>` : ''}
-                ${h.ultima_duracao_s != null ? `<span>${esc(h.ultima_duracao_s)}s</span>` : ''}
-              </div>
-            </div>
-            <div style="text-align:right;flex-shrink:0">
-              <div class="hist-time">${fmtDt(h.ultima_consulta)}</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(h.consultas)}× consultado</div>
-            </div>
-            <button class="hist-del" title="Remover entrada"
-              onclick="event.stopPropagation(); deleteHistoryEntry('${esc(h.cpf)}')">×</button>
-          </div>`).join('');
-      } catch {
-        $histList.innerHTML = '<div class="hist-empty">Erro ao carregar histórico.</div>';
+    function renderHistory() {
+      const data = histLoad();
+      const entries = Object.values(data).sort((a, b) =>
+        (b.ultima_consulta || '') > (a.ultima_consulta || '') ? 1 : -1);
+      if (!entries.length) {
+        $histList.innerHTML = '<div class="hist-empty">Nenhuma consulta registrada ainda.</div>';
+        return;
       }
+      $histList.innerHTML = entries.map(h => `
+        <div class="hist-item" onclick="fillFromHistory('${esc(h.cpf)}','${esc(h.nome||'')}')">
+          <div style="flex:1;min-width:0">
+            <div class="hist-nome">${esc(h.nome) || '—'}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap">
+              <span>${esc(h.cpf)}</span>
+              ${h.numero_certidao ? `<span>Certidão ${esc(h.numero_certidao)}</span>` : ''}
+              ${h.ultima_duracao_s != null ? `<span>${esc(h.ultima_duracao_s)}s</span>` : ''}
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div class="hist-time">${fmtDt(h.ultima_consulta)}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(h.consultas)}× consultado</div>
+          </div>
+          <button class="hist-del" title="Remover entrada"
+            onclick="event.stopPropagation(); deleteHistoryEntry('${esc(h.cpf)}')">×</button>
+        </div>`).join('');
     }
 
     function fillFromHistory(cpf, nome) {
