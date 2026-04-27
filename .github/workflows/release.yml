@@ -22,11 +22,8 @@ jobs:
       - name: Extrair versao
         id: ver
         run: |
-          VER=$(python3 -c "
-          import re, sys
-          m = re.search(r'version=[\"\'']([^\"\']+)[\"\'']', open('app/main.py').read())
-          print(m.group(1)) if m else sys.exit(1)
-          ")
+          VER=$(grep -oP 'version="\K[^"]+' app/main.py | head -1)
+          [ -z "$VER" ] && echo "Versao nao encontrada" && exit 1
           echo "version=$VER" >> $GITHUB_OUTPUT
 
       - name: Verificar se tag ja existe
@@ -40,6 +37,9 @@ jobs:
             echo "new=true" >> $GITHUB_OUTPUT
             echo "Nova versao: v${{ steps.ver.outputs.version }}"
           fi
+
+      - uses: docker/setup-buildx-action@v3
+        if: steps.check.outputs.new == 'true'
 
       - name: Login no GHCR
         if: steps.check.outputs.new == 'true'
@@ -58,6 +58,8 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:${{ steps.ver.outputs.version }}
             ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Criar GitHub Release
         if: steps.check.outputs.new == 'true'
