@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [master]
+    types: [completed]
+
+jobs:
+  release:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extrair versao
+        id: ver
+        run: |
+          VER=$(python3 -c "
+          import re, sys
+          m = re.search(r'version=[\"\'']([^\"\']+)[\"\'']', open('app/main.py').read())
+          print(m.group(1)) if m else sys.exit(1)
+          ")
+          echo "version=$VER" >> $GITHUB_OUTPUT
+
+      - name: Verificar se tag ja existe
+        id: check
+        run: |
+          git fetch --tags
+          if git rev-parse "v${{ steps.ver.outputs.version }}" >/dev/null 2>&1; then
+            echo "new=false" >> $GITHUB_OUTPUT
+            echo "Tag v${{ steps.ver.outputs.version }} ja existe — sem release."
+          else
+            echo "new=true" >> $GITHUB_OUTPUT
+            echo "Nova versao: v${{ steps.ver.outputs.version }}"
+          fi
+
+      - name: Login no GHCR
+        if: steps.check.outputs.new == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build e push Docker
+        if: steps.check.outputs.new == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ steps.ver.outputs.version }}
+            ghcr.io/${{ github.repository }}:latest
+
+      - name: Criar GitHub Release
+        if: steps.check.outputs.new == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: v${{ steps.ver.outputs.version }}
+          generate_release_notes: true
