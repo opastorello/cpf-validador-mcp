@@ -3,6 +3,7 @@ import re
 from starlette.concurrency import run_in_threadpool
 from app.services.cpf import validate_cpf as _validate_cpf, generate_valid_variations as _generate_valid_variations, gerar_cpfs_de_mascara, is_valido, formatar
 from app.services.trt3 import consultar_trt3, consultar_trt3_multiplos
+from app import metrics as _m
 
 mcp = FastMCP("cpf-validador")
 
@@ -10,14 +11,23 @@ mcp = FastMCP("cpf-validador")
 @mcp.tool
 def validate_cpf(cpf: str) -> dict:
     """Valida se um CPF é matematicamente válido (dígitos verificadores corretos)."""
-    return _validate_cpf(cpf)
+    result = _validate_cpf(cpf)
+    label = "valid" if result.get("valido") else "invalid"
+    _m.trt3_mcp_calls_total.labels(tool="validate_cpf", result=label).inc()
+    return result
 
 
 @mcp.tool
 def generate_valid_variations(cpf: str) -> dict:
     """Gera variações matematicamente válidas de um CPF possivelmente errado.
     Estratégias: original, recalcula dígitos verificadores, troca 1 dígito (posições 0-8), transpõe pares adjacentes."""
-    return _generate_valid_variations(cpf)
+    result = _generate_valid_variations(cpf)
+    if "error" in result:
+        _m.trt3_mcp_calls_total.labels(tool="generate_valid_variations", result="invalid").inc()
+    else:
+        _m.trt3_mcp_calls_total.labels(tool="generate_valid_variations", result="success").inc()
+        _m.cpf_variations_generated_total.inc(result.get("total_variacoes", 0))
+    return result
 
 
 @mcp.tool
@@ -26,10 +36,20 @@ async def check_feitos_trabalhistas(cpf: str) -> dict:
     Valida o CPF, resolve captcha automaticamente e retorna o resultado da certidão."""
     cpf_limpo = re.sub(r"\D", "", cpf)
     if len(cpf_limpo) != 11:
+        _m.trt3_mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="invalid").inc()
         return {"erro": f"CPF deve ter 11 dígitos, recebido {len(cpf_limpo)}"}
     if not is_valido(cpf_limpo):
+        _m.trt3_mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="invalid").inc()
         return {"erro": "CPF matematicamente inválido", "cpf": formatar(cpf_limpo)}
-    return await run_in_threadpool(consultar_trt3, cpf_limpo)
+    result = await run_in_threadpool(consultar_trt3, cpf_limpo)
+    if result.get("encontrado"):
+        _m.trt3_mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="found").inc()
+        _m.trt3_matches_total.labels(type="mcp_feitos").inc()
+    elif result.get("erro"):
+        _m.trt3_mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="error").inc()
+    else:
+        _m.trt3_mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="not_found").inc()
+    return result
 
 
 @mcp.tool
@@ -47,13 +67,21 @@ async def find_cpf_by_mask(mascara: str, nome: str | None = None, workers: int =
     try:
         candidates = gerar_cpfs_de_mascara(mascara)
     except ValueError as e:
+        _m.trt3_mcp_calls_total.labels(tool="find_cpf_by_mask", result="invalid").inc()
         return {"erro": str(e)}
 
     if not candidates:
+        _m.trt3_mcp_calls_total.labels(tool="find_cpf_by_mask", result="invalid").inc()
         return {"erro": "Nenhum CPF válido gerado pela máscara", "mascara": mascara}
 
+    _m.cpf_mask_searches_total.inc()
+    _m.cpf_mask_candidates_total.inc(len(candidates))
     resultado = await run_in_threadpool(consultar_trt3_multiplos, candidates, nome, workers)
     resultado["candidatos_gerados"] = len(candidates)
+    matches = len(resultado.get("matches", {}))
+    _m.trt3_mcp_calls_total.labels(tool="find_cpf_by_mask", result="success" if matches else "not_found").inc()
+    if matches:
+        _m.trt3_matches_total.labels(type="mcp_mascara").inc(matches)
     return resultado
 
 
@@ -73,14 +101,12 @@ async def find_cpf_by_variations(cpf_parcial: str, nome: str | None = None, work
 
     cpf_limpo = re.sub(r"\D", "", cpf_parcial)
 
-    # Gera candidatos: se 11 dígitos usa variações normais, se 10 insere dígito em cada posição
     candidates = set()
 
     if len(cpf_limpo) == 11:
         result = generate_valid_variations(cpf_limpo)
         candidates = {v["cpf_numeros"] for v in result.get("variations", [])}
     else:
-        # 10 dígitos: inserir dígito + trocar dígito
         base = cpf_limpo
         for pos in range(11):
             for digit in "0123456789":
@@ -99,12 +125,19 @@ async def find_cpf_by_variations(cpf_parcial: str, nome: str | None = None, work
                             candidates.add(c)
 
     if not candidates:
+        _m.trt3_mcp_calls_total.labels(tool="find_cpf_by_variations", result="invalid").inc()
         return {"erro": "Nenhum candidato válido gerado", "cpf_parcial": cpf_parcial}
 
+    _m.cpf_variation_searches_total.inc()
+    _m.cpf_variation_candidates_total.inc(len(candidates))
     resultado = await run_in_threadpool(
         consultar_trt3_multiplos, list(candidates), nome, workers
     )
     resultado["candidatos_gerados"] = len(candidates)
+    matches = len(resultado.get("matches", {}))
+    _m.trt3_mcp_calls_total.labels(tool="find_cpf_by_variations", result="success" if matches else "not_found").inc()
+    if matches:
+        _m.trt3_matches_total.labels(type="mcp_variacoes").inc(matches)
     return resultado
 
 
@@ -130,9 +163,19 @@ async def check_multiple_cpfs(cpfs: list[str], workers: int = 8) -> dict:
         else:
             cpfs_validos.append(cpf_limpo)
 
+    if erros:
+        _m.cpf_bulk_invalid_total.inc(len(erros))
+
     if not cpfs_validos:
+        _m.trt3_mcp_calls_total.labels(tool="check_multiple_cpfs", result="invalid").inc()
         return {"total": len(cpfs), "erros": erros, "resultados": {}, "matches": {}}
 
+    _m.cpf_bulk_queries_total.inc()
+    _m.cpf_bulk_size.observe(len(cpfs_validos))
     resultado = await run_in_threadpool(consultar_trt3_multiplos, cpfs_validos, None, workers)
     resultado["erros"] = erros
+    matches = len(resultado.get("matches", {}))
+    _m.trt3_mcp_calls_total.labels(tool="check_multiple_cpfs", result="success" if matches else "not_found").inc()
+    if matches:
+        _m.trt3_matches_total.labels(type="mcp_multiplos").inc(matches)
     return resultado

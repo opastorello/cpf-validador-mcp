@@ -97,6 +97,13 @@ async def feitos(request: Request, body: CpfRequest):
     if not is_valido(cpf_limpo):
         raise HTTPException(status_code=422, detail="CPF matematicamente inválido")
     result = await run_in_threadpool(consultar_trt3, cpf_limpo)
+    if result.get("encontrado"):
+        _m.trt3_feitos_total.labels(result="found").inc()
+        _m.trt3_matches_total.labels(type="feitos").inc()
+    elif result.get("erro"):
+        _m.trt3_feitos_total.labels(result="error").inc()
+    else:
+        _m.trt3_feitos_total.labels(result="not_found").inc()
     return result
 
 
@@ -124,6 +131,9 @@ async def feitos_multiplos(request: Request, body: FeitosMultiplosRequest):
         else:
             cpfs_validos.append(cpf_limpo)
 
+    if erros:
+        _m.cpf_bulk_invalid_total.inc(len(erros))
+
     if not cpfs_validos:
         return {"total": len(body.cpfs), "erros": erros, "resultados": {}, "matches": {}}
 
@@ -131,6 +141,9 @@ async def feitos_multiplos(request: Request, body: FeitosMultiplosRequest):
     _m.cpf_bulk_size.observe(len(cpfs_validos))
     resultado = await run_in_threadpool(consultar_trt3_multiplos, cpfs_validos, None, body.workers)
     resultado["erros"] = erros
+    matches = len(resultado.get("matches", {}))
+    if matches:
+        _m.trt3_matches_total.labels(type="multiplos").inc(matches)
     return resultado
 
 
@@ -161,6 +174,9 @@ async def buscar_por_mascara(request: Request, body: BuscarMascaraRequest):
         consultar_trt3_multiplos, candidates, body.nome, body.workers
     )
     resultado["candidatos_gerados"] = len(candidates)
+    matches = len(resultado.get("matches", {}))
+    if matches:
+        _m.trt3_matches_total.labels(type="mascara").inc(matches)
     return resultado
 
 
@@ -266,6 +282,9 @@ async def buscar_por_variacoes(request: Request, body: BuscarVariacoesRequest):
     _m.cpf_variation_candidates_total.inc(len(candidates))
     resultado = await run_in_threadpool(consultar_trt3_multiplos, candidates, body.nome, body.workers)
     resultado["candidatos_gerados"] = len(candidates)
+    matches = len(resultado.get("matches", {}))
+    if matches:
+        _m.trt3_matches_total.labels(type="variacoes").inc(matches)
     return resultado
 
 

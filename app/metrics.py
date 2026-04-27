@@ -1,10 +1,10 @@
 from prometheus_client import Counter, Histogram, Gauge
 
-# ── TRT3 ──────────────────────────────────────────────────────────────────────
+# ── TRT3 scraping ──────────────────────────────────────────────────────────────
 
 trt3_queries_total = Counter(
     "trt3_queries_total",
-    "Consultas ao TRT3 por resultado",
+    "Consultas individuais ao TRT3 por resultado (1 por CPF consultado)",
     ["result"],  # found | not_found | indeterminate | error
 )
 
@@ -60,7 +60,7 @@ trt3_http_errors_total = Counter(
     ["type"],  # timeout | connection | http_status
 )
 
-# ── CPF ───────────────────────────────────────────────────────────────────────
+# ── CPF operações ──────────────────────────────────────────────────────────────
 
 cpf_validations_total = Counter(
     "cpf_validations_total",
@@ -104,15 +104,38 @@ cpf_bulk_size = Histogram(
     buckets=[1, 2, 5, 10, 20, 50, 100],
 )
 
-# ── History ───────────────────────────────────────────────────────────────────
-
-history_entries_current = Gauge(
-    "history_entries_current",
-    "Número atual de entradas no histórico server-side",
+cpf_bulk_invalid_total = Counter(
+    "cpf_bulk_invalid_total",
+    "CPFs inválidos rejeitados em chamadas bulk (formato ou dígitos verificadores)",
 )
 
-history_saves_total = Counter(
-    "history_saves_total",
-    "Salvamentos no histórico",
-    ["action"],  # new | update
+# ── Resultados por endpoint ────────────────────────────────────────────────────
+
+trt3_feitos_total = Counter(
+    "trt3_feitos_total",
+    "Consultas ao /trt3/feitos por resultado",
+    ["result"],  # found | not_found | error
+)
+
+trt3_matches_total = Counter(
+    "trt3_matches_total",
+    "CPFs encontrados (matched) por tipo de busca",
+    ["type"],  # feitos | multiplos | mascara | variacoes | mcp_feitos | mcp_multiplos | mcp_mascara | mcp_variacoes
+)
+
+# ── Acesso / uso ───────────────────────────────────────────────────────────────
+
+trt3_rate_limit_total = Counter(
+    "trt3_rate_limit_total",
+    "Requisições bloqueadas por rate limit por endpoint",
+    ["endpoint"],
+)
+
+trt3_mcp_calls_total = Counter(
+    "trt3_mcp_calls_total",
+    "Chamadas recebidas via MCP por ferramenta e resultado",
+    ["tool", "result"],
+    # tool: validate_cpf|generate_valid_variations|check_feitos_trabalhistas|
+    #       find_cpf_by_mask|find_cpf_by_variations|check_multiple_cpfs
+    # result: success|not_found|invalid|error
 )
