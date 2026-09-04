@@ -317,6 +317,13 @@ curl -X POST http://localhost:8000/consulta/buscar-por-mascara \
 
 O servidor gera todas as combinações válidas para as posições curinga, consulta em paralelo e retorna apenas os matches com o nome informado.
 
+**A busca para assim que confirma o nome.** Confirmar segue a mesma regra do selo `✓ Confirmado`
+da interface: nomes iguais, ou toda palavra procurada aparecendo inteira no nome encontrado —
+`MARIA SILVA` confirma `MARIA APARECIDA SILVA`, mas `SILVA` sozinho não confirma, senão pararia
+no primeiro homônimo parcial. Numa máscara de 1.000 candidatos isso costuma cortar metade das
+consultas ao serviço externo. A resposta traz `consultados` e `interrompido`, e
+`parar_ao_confirmar: false` desliga quando você quiser listar homônimos.
+
 **Formatos de máscara aceitos.** Os curingas `*`, `X`, `x`, `?`, `_` e `#` são equivalentes, os separadores `.`, `-`, `/` e espaços são ignorados (inclusive nenhum separador), e os dígitos verificadores podem ser omitidos. Todas estas máscaras são a mesma coisa:
 
 ```

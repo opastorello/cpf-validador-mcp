@@ -164,6 +164,16 @@ Dois loggers, configurados pelo root logger em `main.py` via `LOG_LEVEL`:
 **CPF nunca sai inteiro no log** — `sources/base.py::mascarar_cpf()` reduz para `111.***.***-35`. O nome da certidão
 só aparece em `DEBUG`. `tests/test_logging.py` trava as duas garantias.
 
+### Busca em lote
+`sources/__init__.py::consultar_multiplos` é agnóstico de fonte e cuida de paralelismo,
+filtro por nome e progresso. Com `nome` informado e `parar_ao_confirmar=True` (padrão), a
+busca é interrompida assim que `nome_confirmado()` casar — as futures pendentes são
+canceladas. A resposta traz `consultados` e `interrompido` além de `total`.
+
+`nome_confirmado()` exige nomes iguais ou toda palavra procurada presente inteira no nome
+encontrado, e recusa filtro de uma palavra só — a mesma regra do selo `✓ Confirmado` da
+interface, que tem a versão em JS.
+
 ### Fluxo de scraping TRT3
 1. GET página do formulário → extrai JSF `ViewState` e URL do CAPTCHA
 2. Download da imagem CAPTCHA → resolve com **modelo CRNN local** (PyTorch, ~99% acurácia)
