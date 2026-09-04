@@ -5,6 +5,8 @@ serviço externo. Hoje a única fonte real é o TRT3; esta camada existe para qu
 uma segunda (outro tribunal, outra base pública) entre sem tocar em `routers/`,
 em `mcp_server.py` nem na lógica de máscara e variações — todas elas só sabem
 pedir "consulte estes CPFs" para a fonte ativa.
+
+Para escrever uma fonte nova, copie `exemplo.py`.
 """
 from abc import ABC, abstractmethod
 

@@ -12,8 +12,8 @@ Por isso o registro é preguiçoso: `trt3` carrega PyTorch para resolver CAPTCHA
 e não faz sentido pagar esse import quando a fonte ativa é outra que não usa
 CAPTCHA nenhum. A classe só é importada quando a fonte é de fato usada.
 
-Para adicionar uma fonte: escreva a classe herdando de `base.Fonte` e
-acrescente uma linha em `_REGISTRO`.
+Para adicionar uma fonte: escreva a classe (copie `exemplo.py`) e acrescente
+uma linha em `_REGISTRO`.
 """
 import importlib
 import logging
@@ -32,6 +32,11 @@ _REGISTRO: dict[str, tuple[str, str, str]] = {
         "app.services.sources.trt3",
         "TRT3",
         "TRT 3ª Região (certidao.trt3.jus.br)",
+    ),
+    "exemplo": (
+        "app.services.sources.exemplo",
+        "Exemplo",
+        "Fonte de exemplo (dados fictícios, não consulta nada)",
     ),
 }
 
