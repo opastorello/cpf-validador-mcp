@@ -8,20 +8,18 @@ se aplica. É o exemplo de que cada fonte resolve o seu CAPTCHA do seu jeito.
 Fluxo de uma consulta:
 
 1. ``GET /api/publico/captcha`` devolve o desafio (nonce, salt, cost, keyPrefix)
-2. resolve o proof-of-work localmente, procurando o contador
+2. resolve o proof-of-work localmente (via altcha-solver), procurando o contador
 3. ``POST .../pessoa-fisica`` com ``{cpf, nome, captcha}``, onde ``captcha`` é o
    desafio + a solução em Base64
 
 O desafio vale ~90s e é de uso único, então não dá para pré-computar em lote:
 cada consulta pede o seu.
 """
-import base64
-import hashlib
-import json
 import logging
 import threading
 import time
 
+from altcha_solver import AltchaSolver
 from curl_cffi import requests as _requests
 
 from app import config as _cfg
@@ -35,6 +33,11 @@ _TCU_BASE = _cfg.TCU_BASE_URL
 _URL_CAPTCHA = f"{_TCU_BASE}/api/publico/captcha"
 _URL_CONSULTA = f"{_TCU_BASE}/api/publico/certidoes/contas-julgadas-irregulares/pessoa-fisica"
 _REFERER = f"{_TCU_BASE}/emitir-certidao-contas-julgadas-irregulares"
+
+# O proof-of-work é resolvido pela altcha-solver, que cobre os 8 algoritmos do
+# Altcha — a nossa implementação anterior só fazia PBKDF2/SHA-256, que é o que o
+# TCU usa hoje. Se o tribunal trocar o algoritmo, a troca é da biblioteca.
+_SOLVER = AltchaSolver(max_iterations=_cfg.TCU_POW_MAX_COUNTER)
 
 # Limita conexões simultâneas ao TCU, como o TRT3 faz com as dele
 _TCU_SEMAPHORE = threading.Semaphore(_cfg.MAX_WORKERS)
@@ -59,35 +62,6 @@ def _obter_desafio(session) -> dict:
     resp = session.get(_URL_CAPTCHA, headers=_HEADERS, timeout=_cfg.HTTP_TIMEOUT)
     resp.raise_for_status()
     return resp.json()
-
-
-def _resolver_pow(desafio: dict) -> dict:
-    """Encontra o contador cujo PBKDF2 começa com o prefixo do desafio.
-
-    ``password = nonce + counter`` (4 bytes big-endian) e a chave derivada tem
-    de começar com ``keyPrefix``. Função pura: dá para testar sem rede.
-    """
-    p = desafio["parameters"]
-    nonce = bytes.fromhex(p["nonce"])
-    salt = bytes.fromhex(p["salt"])
-    cost, key_length, prefixo = p["cost"], p["keyLength"], p["keyPrefix"]
-
-    for counter in range(_cfg.TCU_POW_MAX_COUNTER):
-        chave = hashlib.pbkdf2_hmac(
-            "sha256", nonce + counter.to_bytes(4, "big"), salt, cost, key_length
-        )
-        if chave.hex().startswith(prefixo):
-            return {"counter": counter, "derivedKey": chave.hex(), "time": 0}
-
-    raise ValueError(
-        f"Proof-of-work não resolvido em {_cfg.TCU_POW_MAX_COUNTER} tentativas"
-    )
-
-
-def _montar_captcha(desafio: dict, solucao: dict) -> str:
-    """Desafio original + solução, em Base64, como o Altcha espera."""
-    payload = json.dumps({"challenge": desafio, "solution": solucao})
-    return base64.b64encode(payload.encode()).decode()
 
 
 def _parse_resposta(cpf_fmt: str, status: int, corpo: dict) -> dict:
@@ -148,7 +122,7 @@ def _consultar_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
             desafio = _obter_desafio(session)
 
             t_pow = time.time()
-            solucao = _resolver_pow(desafio)
+            solucao = _SOLVER.solve(desafio)
             dt_pow = time.time() - t_pow
             _m.tcu_pow_duration_seconds.observe(dt_pow)
             _m.tcu_pow_counter.observe(solucao["counter"])
@@ -160,7 +134,7 @@ def _consultar_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
                 _URL_CONSULTA,
                 headers=_HEADERS,
                 json={"cpf": cpf_limpo, "nome": "",
-                      "captcha": _montar_captcha(desafio, solucao)},
+                      "captcha": _SOLVER.build_payload(desafio, solucao)},
                 timeout=_cfg.HTTP_TIMEOUT,
             )
             try:

@@ -103,7 +103,7 @@ A pergunta "a quem pertence este CPF?" é respondida por uma **fonte**. A fonte 
 | `SOURCE` | Fonte | Abrangência | CAPTCHA |
 | -------- | ----- | ----------- | ------- |
 | `trt3` *(padrão)* | TRT 3ª Região — feitos trabalhistas | Minas Gerais | imagem, resolvida por CRNN local |
-| `tcu` | TCU — contas julgadas irregulares | Nacional | Altcha (proof-of-work) |
+| `tcu` | TCU — contas julgadas irregulares | Nacional | Altcha (proof-of-work, via [`altcha-solver`](https://github.com/opastorello/altcha-solver)) |
 | `exemplo` | Dados fictícios, não consulta nada | — | nenhum |
 
 As duas fontes reais não se parecem em nada por dentro, e é essa a prova de que a camada

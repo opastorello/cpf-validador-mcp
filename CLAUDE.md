@@ -116,7 +116,7 @@ app/
 | `SOURCE` | Fonte | Como consulta |
 |----------|-------|---------------|
 | `trt3` (padrão) | TRT 3ª Região (MG) | formulário JSF + CAPTCHA de imagem (CRNN) + PDF |
-| `tcu` | TCU, nacional | API JSON + CAPTCHA Altcha (proof-of-work PBKDF2) |
+| `tcu` | TCU, nacional | API JSON + CAPTCHA Altcha (proof-of-work via `altcha-solver`) |
 | `exemplo` | Fictícia | nada — modelo para novas fontes |
 
 Cada fonte é dona do *como*: cliente HTTP, autenticação, CAPTCHA (ou nenhum), parsing e

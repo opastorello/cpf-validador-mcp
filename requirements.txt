@@ -2,6 +2,9 @@ fastapi>=0.115.0
 fastmcp>=3.0.0
 uvicorn[standard]>=0.30.0
 curl-cffi>=0.7.0
+# proof-of-work do Altcha, usado pela fonte TCU. Puro Python e alguns KB, então
+# não vale um requirements-tcu.txt como o do PyTorch.
+altcha-solver>=1.0.0
 pypdf>=4.0.0
 Pillow>=10.0.0
 pydantic>=2.0.0

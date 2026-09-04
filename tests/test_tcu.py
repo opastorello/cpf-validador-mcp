@@ -1,24 +1,20 @@
 """
 Fonte TCU: proof-of-work do Altcha e tradução da resposta.
 
-As duas partes com lógica são puras de propósito — `_resolver_pow` e
-`_parse_resposta` — então dá para exercitá-las sem rede. Os formatos de
-resposta abaixo são os reais, capturados de certidoes.apps.tcu.gov.br, com
-nome e CPF trocados por fictícios.
+O proof-of-work em si é da biblioteca altcha-solver, que tem os testes dela; o
+que se testa aqui é a nossa fiação com ela e a tradução da resposta do TCU para
+o contrato de `base.Fonte`. Os formatos de resposta abaixo são os reais,
+capturados de certidoes.apps.tcu.gov.br, com nome e CPF trocados por fictícios.
 """
+import base64
 import hashlib
+import json
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from app.services.sources import tcu as m
 from app.services.sources.base import MSG_CPF_INEXISTENTE
-from app.services.sources.tcu import (
-    TCU,
-    _montar_captcha,
-    _parse_resposta,
-    _resolver_pow,
-)
+from app.services.sources.tcu import TCU, _SOLVER, _parse_resposta
 
 CPF = "15187982095"
 CPF_FMT = "151.879.820-95"
@@ -47,36 +43,20 @@ def _desafio(counter_alvo: int, cost: int = 50) -> dict:
 
 
 # ── proof-of-work ──────────────────────────────────────────────────────────
+#
+# O algoritmo é da altcha-solver, que tem os testes dele. O que interessa aqui é
+# a nossa fiação: o desafio chega inteiro no solver e a solução volta no formato
+# que o TCU espera.
 
-@pytest.mark.parametrize("alvo", [0, 1, 37, 250])
-def test_resolve_o_proof_of_work(alvo):
-    solucao = _resolver_pow(_desafio(alvo))
-    assert solucao["counter"] == alvo
-    assert len(solucao["derivedKey"]) == 64
-
-
-def test_a_chave_derivada_comeca_com_o_prefixo():
-    desafio = _desafio(42)
-    solucao = _resolver_pow(desafio)
-    assert solucao["derivedKey"].startswith(desafio["parameters"]["keyPrefix"])
+def test_solver_resolve_um_desafio_real():
+    solucao = _SOLVER.solve(_desafio(37))
+    assert solucao["counter"] == 37
+    assert solucao["derivedKey"].startswith(_desafio(37)["parameters"]["keyPrefix"])
 
 
-def test_desiste_quando_nao_ha_solucao(monkeypatch):
-    """Prefixo impossível: precisa falhar em vez de girar para sempre."""
-    monkeypatch.setattr(m._cfg, "TCU_POW_MAX_COUNTER", 20)
-    desafio = _desafio(0)
-    desafio["parameters"]["keyPrefix"] = "f" * 32
-    with pytest.raises(ValueError, match="Proof-of-work não resolvido"):
-        _resolver_pow(desafio)
-
-
-def test_captcha_vai_em_base64_com_desafio_e_solucao():
-    import base64
-    import json
-
+def test_payload_leva_desafio_e_solucao_em_base64():
     desafio = _desafio(3)
-    solucao = _resolver_pow(desafio)
-    decodificado = json.loads(base64.b64decode(_montar_captcha(desafio, solucao)))
+    decodificado = json.loads(base64.b64decode(_SOLVER.build_payload(desafio, _SOLVER.solve(desafio))))
     assert decodificado["challenge"] == desafio      # o desafio vai intacto
     assert decodificado["solution"]["counter"] == 3
 
