@@ -1,3 +1,4 @@
+import itertools
 import re
 
 
@@ -39,37 +40,81 @@ def validate_cpf(cpf: str) -> dict:
     }
 
 
-def gerar_cpfs_de_mascara(mascara: str) -> list[str]:
-    """Gera todos os CPFs válidos a partir de uma máscara com wildcards nos dígitos desconhecidos.
-    Wildcards aceitos: * , X , x , ? (equivalentes). Ex: '11X.593.91*-??' ou '***.587.570-**'.
-    Os dígitos verificadores (posições 10-11) são sempre recalculados.
+# Curingas aceitos numa máscara — cobrem os formatos que aparecem na prática:
+# mascaramento LGPD de documentos públicos (***.444.777-**), campo de formulário
+# (111.444.___-35), planilha (111.444.###-35) e anotação manual (11X.593.91X-00,
+# 111.444.???-35).
+_MASK_WILDCARDS = "*Xx?_#"
+
+# Separadores ignorados em qualquer posição — inclui o espaço não-quebrável, que
+# vem junto quando a máscara é colada de PDF ou de página web.
+_MASK_SEPARATORS = frozenset(".-/") | {"\\", " ", "\t", " "}
+
+_DIGITS = "0123456789"
+
+
+def _normalizar_mascara(mascara: str) -> list[str]:
+    """Reduz qualquer formato de máscara a 11 posições contendo '0'-'9' ou '*'.
+
+    Aceita qualquer curinga de _MASK_WILDCARDS e qualquer combinação de
+    separadores (ou nenhum). Máscaras de 9 ou 10 posições têm os dígitos
+    verificadores omitidos completados com curinga.
     """
-    # Normaliza wildcards: X, x e ? são equivalentes a *
-    mascara = mascara.upper().replace("X", "*").replace("?", "*")
+    chars: list[str] = []
+    for c in mascara:
+        if c in _MASK_SEPARATORS:
+            continue
+        if c in _DIGITS:
+            chars.append(c)
+        elif c in _MASK_WILDCARDS:
+            chars.append("*")
+        else:
+            raise ValueError(
+                f"Caractere inválido na máscara: {c!r}. Use dígitos, "
+                f"curingas ({' '.join(_MASK_WILDCARDS)}) ou separadores (. - / espaço)"
+            )
 
-    # Extrai sequência de dígitos e wildcards (ignora pontos, traços, espaços)
-    chars = [c for c in mascara if c.isdigit() or c == "*"]
+    # DVs omitidos viram curinga: '111.444.777' e '111.444.777-3' são máscaras válidas
+    if len(chars) in (9, 10):
+        chars += ["*"] * (11 - len(chars))
+
     if len(chars) != 11:
-        raise ValueError(f"Máscara deve ter 11 posições (dígitos ou * / X), recebeu {len(chars)}: '{mascara}'")
+        raise ValueError(
+            f"Máscara deve ter 11 posições — ou 9/10, omitindo os dígitos "
+            f"verificadores. Recebeu {len(chars)}: {mascara!r}"
+        )
 
-    # Posições 0-8 são a base; posições 9-10 são os verificadores (sempre recalculados)
+    return chars
+
+
+def gerar_cpfs_de_mascara(mascara: str) -> list[str]:
+    r"""Gera todos os CPFs válidos a partir de uma máscara com curingas.
+
+    Curingas equivalentes: ``* X x ? _ #``
+    Separadores ignorados: ponto, hífen, barra, contrabarra e espaços — de modo que
+    ``***.444.777-**``, ``***444777**`` e ``*** 444 777 **`` são a mesma máscara.
+
+    Os dígitos verificadores (posições 10-11) são sempre recalculados; quando
+    informados na máscara, funcionam como filtro dos candidatos.
+    """
+    chars = _normalizar_mascara(mascara)
+
+    # Posições 0-8 são a base; 9-10 são os verificadores
     base_template = chars[:9]
+    check_template = chars[9:]
 
-    # Descobre quais posições da base são wildcards
     wildcard_positions = [i for i, c in enumerate(base_template) if c == "*"]
 
     from app import config as _cfg
     if len(wildcard_positions) > _cfg.MAX_WILDCARDS_IN_MASK:
         limit = 10 ** _cfg.MAX_WILDCARDS_IN_MASK
         raise ValueError(
-            f"Máscara tem {len(wildcard_positions)} wildcards na base; "
+            f"Máscara tem {len(wildcard_positions)} curingas na base; "
             f"máximo permitido é {_cfg.MAX_WILDCARDS_IN_MASK} (~{limit:,} combinações)"
         )
 
-    check_template = chars[9:]  # dígitos verificadores especificados pelo usuário
-
     candidates = []
-    for combo in _product("0123456789", repeat=len(wildcard_positions)):
+    for combo in itertools.product(_DIGITS, repeat=len(wildcard_positions)):
         base = list(base_template)
         for pos, digit in zip(wildcard_positions, combo):
             base[pos] = digit
@@ -84,12 +129,6 @@ def gerar_cpfs_de_mascara(mascara: str) -> list[str]:
             candidates.append(cpf11)
 
     return candidates
-
-
-def _product(iterable, repeat=1):
-    """itertools.product reimplementado para evitar import extra."""
-    import itertools
-    return itertools.product(iterable, repeat=repeat)
 
 
 def generate_valid_variations(cpf: str) -> dict:

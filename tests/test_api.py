@@ -167,3 +167,28 @@ def test_auth_com_api_token(monkeypatch):
                    json={"cpf": "111.444.777-35"},
                    headers={"Authorization": "Bearer test-secret"})
         assert r.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# POST /trt3/buscar-por-mascara — formatos de máscara
+# ---------------------------------------------------------------------------
+
+def test_buscar_por_mascara_aceita_formato_alternativo(client):
+    """Curinga '_' e separador padrão chegam até o serviço já normalizados."""
+    capturado = {}
+
+    def _fake(candidatos, nome=None, workers=None, **kw):
+        capturado["candidatos"] = candidatos
+        return {"total": len(candidatos), "matches": {}, "resultados": {}}
+
+    with patch("app.routers.trt3.consultar_trt3_multiplos", side_effect=_fake):
+        r = client.post("/trt3/buscar-por-mascara", json={"mascara": "___.444.777-__"})
+
+    assert r.status_code == 200
+    assert "11144477735" in capturado["candidatos"]
+
+
+def test_buscar_por_mascara_caractere_invalido(client):
+    r = client.post("/trt3/buscar-por-mascara", json={"mascara": "111.444.77A-35"})
+    assert r.status_code == 422
+    assert "Caractere inválido" in r.json()["detail"]

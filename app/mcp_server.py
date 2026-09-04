@@ -54,12 +54,15 @@ async def check_feitos_trabalhistas(cpf: str) -> dict:
 
 @mcp.tool
 async def find_cpf_by_mask(mascara: str, nome: str | None = None, workers: int = 8) -> dict:
-    """Descobre o CPF completo a partir de uma máscara com * nos dígitos desconhecidos.
+    """Descobre o CPF completo a partir de uma máscara com curingas nos dígitos desconhecidos.
     Gera todas as combinações matematicamente válidas e consulta o TRT3 em paralelo.
     Se 'nome' for informado, filtra somente os resultados que contenham o nome na certidão.
 
     Args:
-        mascara: CPF com wildcards nos dígitos desconhecidos. Aceita * , X , x , ? (equivalentes). Ex: '11X.593.91X-00', '***.587.570-**'
+        mascara: CPF com curingas nos dígitos desconhecidos. Curingas equivalentes: * X x ? _ #
+            Separadores (. - / espaço) são ignorados e os dígitos verificadores podem ser omitidos,
+            então '***.444.777-**', '***444777**', '___.444.777-__' e '***.444.777' são a mesma máscara.
+            Ex: '11X.593.91X-00', '***.587.570-**', '111.444.777'
         nome: nome ou parte do nome para filtrar (ex: 'Italvino Rebelatto')
         workers: número de threads paralelas (padrão 8)
     """

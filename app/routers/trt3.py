@@ -71,7 +71,7 @@ class FeitosMultiplosRequest(BaseModel):
 
 class BuscarMascaraRequest(BaseModel):
     model_config = {"json_schema_extra": {"example": {"mascara": "***.444.777-**", "nome": "joao"}}}
-    mascara: str = Field(..., description="CPF com wildcards nos dígitos desconhecidos. Aceita `*`, `X`, `x` ou `?`. Máximo de 5 wildcards na parte base (posições 0–8)", examples=["11X.593.91X-00", "***.444.777-**", "111.444.***-**"])
+    mascara: str = Field(..., description=f"CPF com curingas nos dígitos desconhecidos. Aceita `*`, `X`, `x`, `?`, `_` e `#` (equivalentes) e qualquer separador — `.`, `-`, `/` ou espaço — inclusive nenhum. Os dígitos verificadores podem ser omitidos. Máximo de {_cfg.MAX_WILDCARDS_IN_MASK} curingas na parte base (posições 0–8)", examples=["11X.593.91X-00", "***.444.777-**", "111.444.___-35", "111.444.777"])
     nome: str | None = Field(None, description="Fragmento do nome para filtrar os resultados (opcional, case-insensitive)", examples=["joao", "Maria Silva"])
     workers: int = Field(default=_cfg.DEFAULT_WORKERS, ge=1, le=_cfg.MAX_WORKERS, description=f"Threads paralelas para consulta ao TRT3 (1–{_cfg.MAX_WORKERS})")
 
@@ -151,8 +151,11 @@ async def feitos_multiplos(request: Request, body: FeitosMultiplosRequest):
     "/buscar-por-mascara",
     summary="Descobre CPF completo por máscara com wildcards",
     description=(
-        "Recebe uma máscara de CPF com `*` nos dígitos desconhecidos, gera todas as combinações "
+        "Recebe uma máscara de CPF com curingas nos dígitos desconhecidos, gera todas as combinações "
         "matematicamente válidas e consulta o TRT3 em paralelo. "
+        "Curingas equivalentes: `*`, `X`, `x`, `?`, `_`, `#`. Separadores (`.`, `-`, `/`, espaço) são "
+        "ignorados e os dígitos verificadores podem ser omitidos — `***.444.777-**`, `***444777**` e "
+        "`___.444.777` são a mesma máscara. "
         "Se `nome` for informado, filtra somente os resultados que contenham o nome. "
         f"Máximo de {_cfg.MAX_WILDCARDS_IN_MASK} wildcards na parte base (posições 0–8) para evitar explosão combinatória."
     ),

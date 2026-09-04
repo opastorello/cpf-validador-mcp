@@ -42,7 +42,7 @@ Para confirmar a titularidade de um CPF, o sistema consulta o **TRT3** — que e
 | `POST` | `/cpf/variations` | — | Gera variações válidas de um CPF |
 | `POST` | `/trt3/feitos` | 10/min por IP | Confirma titularidade de um CPF via TRT3 |
 | `POST` | `/trt3/feitos-multiplos` | 5/min por IP | Confirma lista de CPFs em paralelo |
-| `POST` | `/trt3/buscar-por-mascara` | 3/min por IP | Descobre CPF por máscara com `*` |
+| `POST` | `/trt3/buscar-por-mascara` | 3/min por IP | Descobre CPF por máscara com curingas |
 | `POST` | `/trt3/buscar-por-variacoes` | 3/min por IP | Descobre CPF correto a partir de variações |
 | `GET`  | `/auth/check` | — | Valida o token — `401` se ausente/incorreto, `200` se válido |
 | `GET`  | `/health` | — | Health check — retorna `{"status": "ok"}` |
@@ -111,7 +111,7 @@ Todas as opções são lidas de variáveis de ambiente ou do arquivo `.env` na r
 | `DEFAULT_WORKERS` | `8` | Threads paralelas padrão nas consultas em lote |
 | `MAX_WORKERS` | `20` | Limite máximo de `workers` que o cliente pode solicitar |
 | `TASK_TIMEOUT` | `60` | Timeout (segundos) por CPF individual em consultas paralelas |
-| `MAX_WILDCARDS_IN_MASK` | `5` | Máximo de `*` na parte base da máscara (evita explosão combinatória) |
+| `MAX_WILDCARDS_IN_MASK` | `5` | Máximo de curingas na parte base da máscara (evita explosão combinatória) |
 | `RATE_LIMIT_FEITOS` | `10/minute` | Rate limit de `/trt3/feitos` por IP |
 | `RATE_LIMIT_MULTIPLOS` | `5/minute` | Rate limit de `/trt3/feitos-multiplos` por IP |
 | `RATE_LIMIT_MASK` | `3/minute` | Rate limit de `/trt3/buscar-por-mascara` por IP |
@@ -237,7 +237,22 @@ curl -X POST http://localhost:8000/trt3/buscar-por-mascara \
   -d '{"mascara": "***.123.456-**", "nome": "João Silva"}'
 ```
 
-O servidor gera todas as combinações válidas para as posições com `*`, consulta em paralelo e retorna apenas os matches com o nome informado.
+O servidor gera todas as combinações válidas para as posições curinga, consulta em paralelo e retorna apenas os matches com o nome informado.
+
+**Formatos de máscara aceitos.** Os curingas `*`, `X`, `x`, `?`, `_` e `#` são equivalentes, os separadores `.`, `-`, `/` e espaços são ignorados (inclusive nenhum separador), e os dígitos verificadores podem ser omitidos. Todas estas máscaras são a mesma coisa:
+
+```
+***.444.777-**      ← mascaramento LGPD de documento público
+***444777**         ← sem separador
+*** 444 777 **      ← separado por espaço
+XXX.444.777-XX      ← anotação manual
+???.444.777-??
+___.444.777-__      ← campo de formulário
+###.444.777-##      ← planilha
+***.444.777         ← dígitos verificadores omitidos
+```
+
+Um caractere que não seja dígito, curinga ou separador é rejeitado com `422` apontando qual é — em vez de ser descartado silenciosamente e virar erro de tamanho.
 
 > Máximo de 5 wildcards na parte base (posições 0–8) = até 100.000 combinações. Configurável via `MAX_WILDCARDS_IN_MASK`.
 

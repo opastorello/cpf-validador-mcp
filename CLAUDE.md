@@ -68,7 +68,7 @@ app/
 | `validate_cpf` | Validação matemática via algoritmo módulo-11 |
 | `generate_valid_variations` | Gera variações válidas: recalcula dígitos, troca 1 dígito, transpõe pares adjacentes |
 | `check_feitos_trabalhistas` | Consulta TRT3 — valida CPF, resolve CAPTCHA (CRNN), retorna resultado estruturado |
-| `find_cpf_by_mask` | Descobre CPF completo a partir de máscara com `*` — consulta TRT3 em paralelo |
+| `find_cpf_by_mask` | Descobre CPF completo a partir de máscara com curingas — consulta TRT3 em paralelo |
 | `find_cpf_by_variations` | Gera candidatos de CPF parcial/errado e consulta TRT3 em paralelo, filtra por nome |
 | `check_multiple_cpfs` | Consulta lista de CPFs em paralelo, agrupa erros de validação separadamente |
 
@@ -80,7 +80,7 @@ app/
 | POST | `/cpf/variations` | — | Gera variações válidas |
 | POST | `/trt3/feitos` | 10/min por IP | Consulta feitos de um CPF |
 | POST | `/trt3/feitos-multiplos` | 5/min por IP | Consulta lista de CPFs em paralelo |
-| POST | `/trt3/buscar-por-mascara` | 3/min por IP | Consulta CPFs por máscara com `*` |
+| POST | `/trt3/buscar-por-mascara` | 3/min por IP | Consulta CPFs por máscara com curingas |
 | POST | `/trt3/buscar-por-variacoes` | 3/min por IP | Consulta variações de CPF parcial |
 | GET | `/auth/check` | — | Valida o token (401 se inválido) — usado pelo gate da UI |
 | GET | `/health` | — | Health check (sempre aberto — healthcheck do Docker) |
@@ -94,6 +94,13 @@ app/
 - `METRICS_PUBLIC=true` → abre `/metrics` sem token também em `production`
 - Interface web (`/`) tem gate: exige token no browser quando `API_TOKEN` está configurado. O gate valida contra `/auth/check` — **nunca** contra uma rota aberta como `/health`, senão qualquer token passa
 - O histórico da UI vive no `localStorage` do navegador; o servidor não persiste consultas
+
+### Máscaras de CPF
+`services/cpf.py::_normalizar_mascara` reduz qualquer formato a 11 posições antes de gerar candidatos:
+- Curingas equivalentes: `*` `X` `x` `?` `_` `#`
+- Separadores ignorados: `.` `-` `/` `\`, espaço, tab e espaço não-quebrável (colagem de PDF/web)
+- Máscaras de 9 ou 10 posições completam os dígitos verificadores com curinga
+- Caractere desconhecido → `ValueError` apontando o caractere (nunca descarte silencioso)
 
 ### Fluxo de scraping TRT3
 1. GET página do formulário → extrai JSF `ViewState` e URL do CAPTCHA
