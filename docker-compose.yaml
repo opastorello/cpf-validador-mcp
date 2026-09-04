@@ -27,6 +27,11 @@ services:
       - CAPTCHA_MODEL_PATH=${CAPTCHA_MODEL_PATH:-}
       - METRICS_PUBLIC=${METRICS_PUBLIC:-false}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # Proxies em que confiar para ler X-Forwarded-For. "*" vale quando o
+      # container só é alcançável pelo proxy — que é o caso atrás do Coolify.
+      # Se a porta ficar exposta direto, restrinja ao IP do proxy, senão dá
+      # para forjar o header e furar o rate limit.
+      - FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS:-*}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s

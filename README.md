@@ -196,6 +196,7 @@ Todas as opções são lidas de variáveis de ambiente ou do arquivo `.env` na r
 | `CAPTCHA_MODEL_PATH` | *(vazio — usa `app/captcha/captcha_model.pt`)* | Path absoluto para o modelo `.pt` (útil para montar modelo externo) |
 | `METRICS_PUBLIC` | `false` | `true` abre `/metrics` sem token também em `production` |
 | `LOG_LEVEL` | `INFO` | Nível de log da consulta ao TRT3. `DEBUG` mostra cada tentativa de CAPTCHA |
+| `FORWARDED_ALLOW_IPS` | `*` | Proxies em que confiar para ler `X-Forwarded-For`. Necessário para o rate limit contar por IP real atrás de proxy |
 
 ### 🔒 Rotas abertas por ambiente
 

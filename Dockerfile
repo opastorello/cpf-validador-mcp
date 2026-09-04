@@ -18,4 +18,8 @@ USER mcpuser
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --proxy-headers faz o uvicorn usar o X-Forwarded-For como IP do cliente. Sem
+# isso, atrás de um proxy (Traefik do Coolify, nginx) todo mundo chega com o IP
+# do proxy e divide o mesmo balde de rate limit. Quais proxies confiar vem de
+# FORWARDED_ALLOW_IPS, lido pelo próprio uvicorn.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
