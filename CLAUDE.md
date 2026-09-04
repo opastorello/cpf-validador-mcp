@@ -119,8 +119,13 @@ app/
 
 Cada fonte é dona do *como*: cliente HTTP, autenticação, CAPTCHA (ou nenhum), parsing e
 limite de conexões. A camada comum padroniza só o retorno — `cpf`, `encontrado`
-(`True`/`False`/`None`), `nome_certidao` e `erro`, documentado em `base.Fonte.consultar`.
-`nome_certidao` é obrigatório para que o filtro `nome=` das buscas em lote funcione.
+(`True`/`False`/`None`), `nome_certidao`, `cpf_inexistente`, `mensagem` e `erro`,
+documentado em `base.Fonte.consultar`. `nome_certidao` é obrigatório para que o filtro
+`nome=` das buscas em lote funcione, e `mensagem` é exibida pela UI como veio — nada de
+texto específico de uma fonte dentro da interface.
+
+A fonte declara também `usa_captcha` (padrão `False`), que a UI recebe via
+`__USA_CAPTCHA__` para escolher os rótulos dos passos.
 
 O registro é **preguiçoso**: a classe só é importada quando a fonte é usada, para que uma
 fonte sem CAPTCHA não carregue o PyTorch do TRT3. `tests/test_sources.py` trava isso.

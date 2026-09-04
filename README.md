@@ -108,10 +108,26 @@ Cada fonte decide sozinha **como** consulta — cliente HTTP, autenticação, CA
 ausência dele, parsing da resposta e limite de conexões simultâneas. A camada comum
 padroniza apenas o formato do resultado.
 
+A fonte também declara o que sabe fazer, e a interface se adapta: uma fonte com
+`usa_captcha = False` mostra "Consulta concluída" no lugar de "CAPTCHA resolvido", em vez
+de anunciar um trabalho que não aconteceu.
+
 #### Escrevendo uma fonte nova
 
 Copie `app/services/sources/exemplo.py` — ele tem os cinco passos de uma consulta
 comentados — implemente `consultar()` e registre a classe:
+
+```python
+class TRT2(Fonte):
+    nome = "trt2"                       # o valor usado em SOURCE=
+    rotulo = "TRT 2ª Região (SP)"       # texto legível, aparece no log e na UI
+    usa_captcha = True                  # padrão é False
+
+    def consultar(self, cpf_limpo: str) -> dict:
+        ...
+```
+
+E registre:
 
 ```python
 # app/services/sources/__init__.py
