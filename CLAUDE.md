@@ -41,7 +41,11 @@ app/
 ├── auth.py           # TokenMiddleware — autenticação via API_TOKEN + controle prod/dev via ENV
 ├── services/
 │   ├── cpf.py        # Lógica pura de CPF (zero deps de framework)
-│   └── trt3.py       # Web scraping TRT3: curl_cffi + CAPTCHA CRNN + pypdf + ThreadPoolExecutor
+│   └── sources/      # Fontes de consulta — a fonte ativa vem de SOURCE no .env
+│       ├── base.py     # ABC Fonte + contrato do retorno + mascarar_cpf (log)
+│       ├── __init__.py # Registro preguiçoso + busca em lote (agnóstica de fonte)
+│       ├── trt3.py     # TRT3: curl_cffi + CAPTCHA CRNN + pypdf
+│       └── exemplo.py  # Modelo para novas fontes — fictícia, sem rede e sem CAPTCHA
 ├── routers/
 │   ├── cpf.py        # POST /cpf/validate, POST /cpf/variations
 │   ├── trt3.py       # POST /trt3/feitos, /feitos-multiplos, /buscar-por-mascara, /buscar-por-variacoes
@@ -59,8 +63,10 @@ app/
 ### Regras de camada
 - `services/` — zero imports de FastAPI ou FastMCP; puro Python
 - `routers/` e `mcp_server.py` importam apenas de `services/` — mesma lógica de negócio, duas interfaces
-- I/O bloqueante em `services/trt3.py` sempre executado via `run_in_threadpool`
-- Consultas paralelas usam `ThreadPoolExecutor` dentro de `services/trt3.py` (não nos routers)
+- `routers/` e `mcp_server.py` **nunca** importam uma fonte concreta: só `services.sources.consultar`
+  e `consultar_multiplos`, que despacham para a fonte ativa
+- I/O bloqueante em `services/sources/` sempre executado via `run_in_threadpool`
+- Consultas paralelas usam `ThreadPoolExecutor` em `services/sources/__init__.py` (não nos routers)
 
 ### MCP tools (6)
 | Tool | Descrição |
@@ -101,6 +107,26 @@ app/
 - Separadores ignorados: `.` `-` `/` `\`, espaço, tab e espaço não-quebrável (colagem de PDF/web)
 - Máscaras de 9 ou 10 posições completam os dígitos verificadores com curinga
 - Caractere desconhecido → `ValueError` apontando o caractere (nunca descarte silencioso)
+
+### Fontes de consulta
+`SOURCE` no .env escolhe quem responde "a quem pertence este CPF?". Registradas em
+`services/sources/__init__.py::_REGISTRO`:
+
+| `SOURCE` | Fonte |
+|----------|-------|
+| `trt3` (padrão) | TRT 3ª Região — scraping real com CAPTCHA |
+| `exemplo` | Dados fictícios, sem rede e sem CAPTCHA — modelo para novas fontes |
+
+Cada fonte é dona do *como*: cliente HTTP, autenticação, CAPTCHA (ou nenhum), parsing e
+limite de conexões. A camada comum padroniza só o retorno — `cpf`, `encontrado`
+(`True`/`False`/`None`), `nome_certidao` e `erro`, documentado em `base.Fonte.consultar`.
+`nome_certidao` é obrigatório para que o filtro `nome=` das buscas em lote funcione.
+
+O registro é **preguiçoso**: a classe só é importada quando a fonte é usada, para que uma
+fonte sem CAPTCHA não carregue o PyTorch do TRT3. `tests/test_sources.py` trava isso.
+
+Para adicionar uma fonte: copie `sources/exemplo.py`, implemente `consultar()` e acrescente
+uma linha em `_REGISTRO`. Nenhum router ou tool MCP precisa mudar.
 
 ### Logs da consulta
 `services/trt3.py` usa `logging.getLogger("trt3")`; o root logger é configurado em `main.py` via `LOG_LEVEL`.

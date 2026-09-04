@@ -70,7 +70,11 @@ app/
 ├── auth.py             # TokenMiddleware — autenticação via API_TOKEN + controle prod/dev
 ├── services/
 │   ├── cpf.py          # Validação, variações e geração por máscara (zero deps de framework)
-│   └── trt3.py         # Consulta TRT3: curl_cffi + CAPTCHA solver + pypdf
+│   └── sources/        # Fontes de consulta — escolhidas por SOURCE no .env
+│       ├── base.py       # Contrato: ABC Fonte + formato do retorno
+│       ├── __init__.py   # Registro + busca em lote paralela (agnóstica de fonte)
+│       ├── trt3.py       # TRT3: curl_cffi + CAPTCHA solver + pypdf
+│       └── exemplo.py    # Modelo para novas fontes (fictícia, sem rede)
 ├── routers/
 │   ├── cpf.py          # POST /cpf/validate, POST /cpf/variations
 │   ├── trt3.py         # POST /trt3/feitos, /feitos-multiplos, /buscar-por-mascara, /buscar-por-variacoes
@@ -87,8 +91,52 @@ app/
 
 **Regras de camada:**
 - `services/` — zero imports de FastAPI ou FastMCP
-- `routers/` e `mcp_server.py` — importam apenas de `services/`
-- I/O bloqueante em `services/trt3.py` é sempre executado via `run_in_threadpool`
+- `routers/` e `mcp_server.py` — importam apenas de `services/`, e nunca uma fonte concreta
+- I/O bloqueante em `services/sources/` é sempre executado via `run_in_threadpool`
+
+### 🔌 Fontes de consulta
+
+A pergunta "a quem pertence este CPF?" é respondida por uma **fonte**. A fonte ativa vem de
+`SOURCE` no `.env`:
+
+| `SOURCE` | Fonte | Consulta rede? | CAPTCHA? |
+| -------- | ----- | :------------: | :------: |
+| `trt3` *(padrão)* | TRT 3ª Região | sim | sim, CRNN local |
+| `exemplo` | Dados fictícios | não | não |
+
+Cada fonte decide sozinha **como** consulta — cliente HTTP, autenticação, CAPTCHA ou a
+ausência dele, parsing da resposta e limite de conexões simultâneas. A camada comum
+padroniza apenas o formato do resultado.
+
+#### Escrevendo uma fonte nova
+
+Copie `app/services/sources/exemplo.py` — ele tem os cinco passos de uma consulta
+comentados — implemente `consultar()` e registre a classe:
+
+```python
+# app/services/sources/__init__.py
+_REGISTRO = {
+    "trt3":    ("app.services.sources.trt3",    "TRT3",    "TRT 3ª Região"),
+    "trt2":    ("app.services.sources.trt2",    "TRT2",    "TRT 2ª Região (SP)"),  # nova
+}
+```
+
+O contrato do retorno é este — só estas chaves são interpretadas:
+
+```python
+{
+    "cpf": "111.444.777-35",       # obrigatório, formatado
+    "encontrado": True,            # True achou | False não consta | None erro
+    "nome_certidao": "FULANO",     # o filtro nome= das buscas em lote depende desta chave
+    "erro": "...",                 # só quando a consulta falhou
+}
+```
+
+`consultar()` **não deve levantar exceção**: falha vira `encontrado: None` + `erro`. Quem
+chama roda centenas em paralelo e trata ausência de resultado, não stack trace.
+
+Nenhum router, tool MCP ou a lógica de máscara/variações precisa mudar — todos falam com a
+fonte ativa através de `sources.consultar()` e `sources.consultar_multiplos()`.
 
 ---
 
