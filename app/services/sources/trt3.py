@@ -162,9 +162,7 @@ def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
             action_url, viewstate, captcha_url = _fetch_page(session)
 
             if not captcha_url:
-                _m.trt3_queries_total.labels(result="error").inc()
                 _m.trt3_captcha_retries_per_query.observe(attempts)
-                _m.trt3_query_duration_seconds.observe(time.time() - t_query_start)
                 log.error("página do TRT3 sem URL de CAPTCHA (layout mudou?) cpf=%s", cpf_log)
                 return {"cpf": cpf_fmt, "encontrado": None, "erro": "CAPTCHA URL não encontrada."}
 
@@ -205,9 +203,7 @@ def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
                                 cpf_log, type(exc).__name__, exc)
                     dados = {}
                 _m.trt3_captcha_retries_per_query.observe(attempts)
-                _m.trt3_queries_total.labels(result="found").inc()
                 dt = time.time() - t_query_start
-                _m.trt3_query_duration_seconds.observe(dt)
                 log.info("certidão obtida cpf=%s tipo=%s tentativas=%d em %.1fs",
                          cpf_log, dados.get("tipo_certidao", "?"), attempts, dt)
                 return {"cpf": cpf_fmt, "encontrado": True, **dados}
@@ -221,9 +217,7 @@ def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
             if re.search(r"n[ãa]o encontrado na Receita Federal", resp.text, re.IGNORECASE):
                 _m.trt3_captcha_result_total.labels(result="success").inc()
                 _m.trt3_captcha_retries_per_query.observe(attempts)
-                _m.trt3_queries_total.labels(result="not_registered").inc()
                 dt = time.time() - t_query_start
-                _m.trt3_query_duration_seconds.observe(dt)
                 log.info("CPF não cadastrado na Receita Federal cpf=%s tentativas=%d em %.1fs",
                          cpf_log, attempts, dt)
                 return {
@@ -264,10 +258,7 @@ def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
 
             _m.trt3_captcha_retries_per_query.observe(attempts)
             found = result.get("encontrado")
-            label = "found" if found is True else "not_found" if found is False else "indeterminate"
-            _m.trt3_queries_total.labels(result=label).inc()
             dt = time.time() - t_query_start
-            _m.trt3_query_duration_seconds.observe(dt)
             if found is True:
                 log.info("certidão obtida cpf=%s tentativas=%d em %.1fs", cpf_log, attempts, dt)
             elif found is False:
@@ -286,9 +277,7 @@ def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
             continue
 
     _m.trt3_captcha_retries_per_query.observe(attempts)
-    _m.trt3_queries_total.labels(result="error").inc()
     dt = time.time() - t_query_start
-    _m.trt3_query_duration_seconds.observe(dt)
     log.error("desisti de cpf=%s após %d tentativas de CAPTCHA (%.1fs)",
               cpf_log, _cfg.MAX_CAPTCHA_ATTEMPTS, dt)
     return {"cpf": cpf_fmt, "encontrado": None, "erro": f"CAPTCHA não resolvido após {_cfg.MAX_CAPTCHA_ATTEMPTS} tentativas."}

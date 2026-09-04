@@ -128,6 +128,16 @@ fonte sem CAPTCHA não carregue o PyTorch do TRT3. `tests/test_sources.py` trava
 Para adicionar uma fonte: copie `sources/exemplo.py`, implemente `consultar()` e acrescente
 uma linha em `_REGISTRO`. Nenhum router ou tool MCP precisa mudar.
 
+### Métricas
+Dois grupos, separados pelo que é conceito de consulta e o que é do scraping:
+- `consulta_*` — valem para qualquer fonte e levam o label `fonte`
+  (`consulta_queries_total`, `consulta_duration_seconds`, `consulta_feitos_total`,
+  `consulta_matches_total`). São incrementadas num ponto só, em
+  `sources/__init__.py::_consultar_medindo`, para toda fonte ser medida igual
+- `trt3_*` — CAPTCHA, PDF, resets de sessão e erros HTTP; não existem para uma
+  fonte sem CAPTCHA
+- `cpf_*`, `mcp_calls_total`, `http_rate_limit_total` — da aplicação
+
 ### Logs da consulta
 Dois loggers, configurados pelo root logger em `main.py` via `LOG_LEVEL`:
 - `consulta` (`sources/__init__.py`) — o que vale para qualquer fonte: início, progresso, fim de

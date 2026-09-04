@@ -1,12 +1,38 @@
 from prometheus_client import Counter, Histogram, Gauge
 
-# ── TRT3 scraping ──────────────────────────────────────────────────────────────
+# ── Consulta (vale para qualquer fonte) ────────────────────────────────────────
+#
+# Estas métricas medem o conceito "consultar um CPF numa fonte", então levam o
+# label `fonte` e são incrementadas em services/sources/__init__.py, num ponto
+# só, para toda fonte ser medida do mesmo jeito. As de prefixo trt3_ abaixo são
+# do scraping do TRT3 e não existem para uma fonte sem CAPTCHA ou sem PDF.
 
-trt3_queries_total = Counter(
-    "trt3_queries_total",
-    "Consultas individuais ao TRT3 por resultado (1 por CPF consultado)",
-    ["result"],  # found | not_found | indeterminate | error
+consulta_queries_total = Counter(
+    "consulta_queries_total",
+    "Consultas individuais por fonte e resultado (1 por CPF consultado)",
+    ["fonte", "result"],  # found | not_found | not_registered | indeterminate | error
 )
+
+consulta_duration_seconds = Histogram(
+    "consulta_duration_seconds",
+    "Tempo total de uma consulta, por fonte",
+    ["fonte"],
+    buckets=[2, 5, 10, 20, 30, 60, 120, 300],
+)
+
+consulta_feitos_total = Counter(
+    "consulta_feitos_total",
+    "Consultas ao endpoint de CPF único, por fonte e resultado",
+    ["fonte", "result"],  # found | not_found | error
+)
+
+consulta_matches_total = Counter(
+    "consulta_matches_total",
+    "CPFs encontrados (matched) por fonte e tipo de busca",
+    ["fonte", "type"],
+)
+
+# ── TRT3 scraping (específico desta fonte) ─────────────────────────────────────
 
 trt3_captcha_attempts_total = Counter(
     "trt3_captcha_attempts_total",
@@ -23,12 +49,6 @@ trt3_captcha_duration_seconds = Histogram(
     "trt3_captcha_duration_seconds",
     "Tempo para baixar e resolver o CAPTCHA",
     buckets=[0.1, 0.3, 0.5, 1.0, 2.0, 5.0, 10.0],
-)
-
-trt3_query_duration_seconds = Histogram(
-    "trt3_query_duration_seconds",
-    "Tempo total de uma consulta ao TRT3 (inclui todas as tentativas de CAPTCHA)",
-    buckets=[2, 5, 10, 20, 30, 60, 120, 300],
 )
 
 trt3_captcha_retries_per_query = Histogram(
@@ -111,28 +131,16 @@ cpf_bulk_invalid_total = Counter(
 
 # ── Resultados por endpoint ────────────────────────────────────────────────────
 
-trt3_feitos_total = Counter(
-    "trt3_feitos_total",
-    "Consultas ao /trt3/feitos por resultado",
-    ["result"],  # found | not_found | error
-)
-
-trt3_matches_total = Counter(
-    "trt3_matches_total",
-    "CPFs encontrados (matched) por tipo de busca",
-    ["type"],  # feitos | multiplos | mascara | variacoes | mcp_feitos | mcp_multiplos | mcp_mascara | mcp_variacoes
-)
-
 # ── Acesso / uso ───────────────────────────────────────────────────────────────
 
-trt3_rate_limit_total = Counter(
-    "trt3_rate_limit_total",
+http_rate_limit_total = Counter(
+    "http_rate_limit_total",
     "Requisições bloqueadas por rate limit por endpoint",
     ["endpoint"],
 )
 
-trt3_mcp_calls_total = Counter(
-    "trt3_mcp_calls_total",
+mcp_calls_total = Counter(
+    "mcp_calls_total",
     "Chamadas recebidas via MCP por ferramenta e resultado",
     ["tool", "result"],
     # tool: validate_cpf|generate_valid_variations|check_feitos_trabalhistas|

@@ -21,6 +21,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout, as_completed
 
 from app import config as _cfg
+from app import metrics as _m
 from app.services.cpf import formatar
 from app.services.sources.base import Fonte, mascarar_cpf
 
@@ -66,9 +67,39 @@ def get_fonte(nome: str | None = None) -> Fonte:
     return _instancias[escolhida]
 
 
+def _rotulo(resultado: dict) -> str:
+    """Traduz o resultado da fonte para o label da métrica."""
+    if resultado.get("erro"):
+        return "error"
+    if resultado.get("cpf_inexistente"):
+        return "not_registered"
+    achou = resultado.get("encontrado")
+    return "found" if achou is True else "not_found" if achou is False else "indeterminate"
+
+
+def _consultar_medindo(ativa: Fonte, cpf_limpo: str) -> dict:
+    """Consulta contando tempo e resultado.
+
+    Fica aqui, e não dentro de cada fonte, para que toda fonte seja medida do
+    mesmo jeito e com o mesmo label `fonte` — sem depender de cada
+    implementação lembrar de instrumentar.
+    """
+    t0 = time.time()
+    try:
+        resultado = ativa.consultar(cpf_limpo)
+    except Exception:
+        _m.consulta_queries_total.labels(fonte=ativa.nome, result="error").inc()
+        _m.consulta_duration_seconds.labels(fonte=ativa.nome).observe(time.time() - t0)
+        raise
+    _m.consulta_queries_total.labels(fonte=ativa.nome, result=_rotulo(resultado)).inc()
+    _m.consulta_duration_seconds.labels(fonte=ativa.nome).observe(time.time() - t0)
+    return resultado
+
+
 def consultar(cpf_limpo: str, fonte: str | None = None) -> dict:
     """Consulta um CPF na fonte ativa."""
-    return get_fonte(fonte).consultar(cpf_limpo)
+    ativa = get_fonte(fonte)
+    return _consultar_medindo(ativa, cpf_limpo)
 
 
 def consultar_multiplos(
@@ -99,7 +130,7 @@ def consultar_multiplos(
     log.info("lote iniciado: fonte=%s, %d cpf(s), %d workers%s",
              ativa.nome, len(cpfs), n_workers, f", filtrando nome={nome_filtro!r}" if filtro else "")
     with ThreadPoolExecutor(max_workers=n_workers) as executor:
-        futures = {executor.submit(ativa.consultar, cpf): cpf for cpf in cpfs}
+        futures = {executor.submit(_consultar_medindo, ativa, cpf): cpf for cpf in cpfs}
         for future in as_completed(futures):
             cpf = futures[future]
             try:

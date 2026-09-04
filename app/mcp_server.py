@@ -3,6 +3,7 @@ import re
 from starlette.concurrency import run_in_threadpool
 from app.services.cpf import validate_cpf as _validate_cpf, generate_valid_variations as _generate_valid_variations, gerar_cpfs_de_mascara, is_valido, formatar
 from app.services.sources import consultar as consultar_fonte, consultar_multiplos
+from app import config as _cfg
 from app import metrics as _m
 
 mcp = FastMCP("cpf-validador")
@@ -13,7 +14,7 @@ def validate_cpf(cpf: str) -> dict:
     """Valida se um CPF é matematicamente válido (dígitos verificadores corretos)."""
     result = _validate_cpf(cpf)
     label = "valid" if result.get("valido") else "invalid"
-    _m.trt3_mcp_calls_total.labels(tool="validate_cpf", result=label).inc()
+    _m.mcp_calls_total.labels(tool="validate_cpf", result=label).inc()
     return result
 
 
@@ -23,9 +24,9 @@ def generate_valid_variations(cpf: str) -> dict:
     Estratégias: original, recalcula dígitos verificadores, troca 1 dígito (posições 0-8), transpõe pares adjacentes."""
     result = _generate_valid_variations(cpf)
     if "error" in result:
-        _m.trt3_mcp_calls_total.labels(tool="generate_valid_variations", result="invalid").inc()
+        _m.mcp_calls_total.labels(tool="generate_valid_variations", result="invalid").inc()
     else:
-        _m.trt3_mcp_calls_total.labels(tool="generate_valid_variations", result="success").inc()
+        _m.mcp_calls_total.labels(tool="generate_valid_variations", result="success").inc()
         _m.cpf_variations_generated_total.inc(result.get("total_variacoes", 0))
     return result
 
@@ -36,19 +37,19 @@ async def check_feitos_trabalhistas(cpf: str) -> dict:
     Valida o CPF, resolve captcha automaticamente e retorna o resultado da certidão."""
     cpf_limpo = re.sub(r"\D", "", cpf)
     if len(cpf_limpo) != 11:
-        _m.trt3_mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="invalid").inc()
+        _m.mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="invalid").inc()
         return {"erro": f"CPF deve ter 11 dígitos, recebido {len(cpf_limpo)}"}
     if not is_valido(cpf_limpo):
-        _m.trt3_mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="invalid").inc()
+        _m.mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="invalid").inc()
         return {"erro": "CPF matematicamente inválido", "cpf": formatar(cpf_limpo)}
     result = await run_in_threadpool(consultar_fonte, cpf_limpo)
     if result.get("encontrado"):
-        _m.trt3_mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="found").inc()
-        _m.trt3_matches_total.labels(type="mcp_feitos").inc()
+        _m.mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="found").inc()
+        _m.consulta_matches_total.labels(fonte=_cfg.SOURCE, type="mcp_feitos").inc()
     elif result.get("erro"):
-        _m.trt3_mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="error").inc()
+        _m.mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="error").inc()
     else:
-        _m.trt3_mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="not_found").inc()
+        _m.mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="not_found").inc()
     return result
 
 
@@ -70,11 +71,11 @@ async def find_cpf_by_mask(mascara: str, nome: str | None = None, workers: int =
     try:
         candidates = gerar_cpfs_de_mascara(mascara)
     except ValueError as e:
-        _m.trt3_mcp_calls_total.labels(tool="find_cpf_by_mask", result="invalid").inc()
+        _m.mcp_calls_total.labels(tool="find_cpf_by_mask", result="invalid").inc()
         return {"erro": str(e)}
 
     if not candidates:
-        _m.trt3_mcp_calls_total.labels(tool="find_cpf_by_mask", result="invalid").inc()
+        _m.mcp_calls_total.labels(tool="find_cpf_by_mask", result="invalid").inc()
         return {"erro": "Nenhum CPF válido gerado pela máscara", "mascara": mascara}
 
     _m.cpf_mask_searches_total.inc()
@@ -82,9 +83,9 @@ async def find_cpf_by_mask(mascara: str, nome: str | None = None, workers: int =
     resultado = await run_in_threadpool(consultar_multiplos, candidates, nome, workers)
     resultado["candidatos_gerados"] = len(candidates)
     matches = len(resultado.get("matches", {}))
-    _m.trt3_mcp_calls_total.labels(tool="find_cpf_by_mask", result="success" if matches else "not_found").inc()
+    _m.mcp_calls_total.labels(tool="find_cpf_by_mask", result="success" if matches else "not_found").inc()
     if matches:
-        _m.trt3_matches_total.labels(type="mcp_mascara").inc(matches)
+        _m.consulta_matches_total.labels(fonte=_cfg.SOURCE, type="mcp_mascara").inc(matches)
     return resultado
 
 
@@ -128,7 +129,7 @@ async def find_cpf_by_variations(cpf_parcial: str, nome: str | None = None, work
                             candidates.add(c)
 
     if not candidates:
-        _m.trt3_mcp_calls_total.labels(tool="find_cpf_by_variations", result="invalid").inc()
+        _m.mcp_calls_total.labels(tool="find_cpf_by_variations", result="invalid").inc()
         return {"erro": "Nenhum candidato válido gerado", "cpf_parcial": cpf_parcial}
 
     _m.cpf_variation_searches_total.inc()
@@ -138,9 +139,9 @@ async def find_cpf_by_variations(cpf_parcial: str, nome: str | None = None, work
     )
     resultado["candidatos_gerados"] = len(candidates)
     matches = len(resultado.get("matches", {}))
-    _m.trt3_mcp_calls_total.labels(tool="find_cpf_by_variations", result="success" if matches else "not_found").inc()
+    _m.mcp_calls_total.labels(tool="find_cpf_by_variations", result="success" if matches else "not_found").inc()
     if matches:
-        _m.trt3_matches_total.labels(type="mcp_variacoes").inc(matches)
+        _m.consulta_matches_total.labels(fonte=_cfg.SOURCE, type="mcp_variacoes").inc(matches)
     return resultado
 
 
@@ -171,7 +172,7 @@ async def check_multiple_cpfs(cpfs: list[str], workers: int = 8) -> dict:
         _m.cpf_bulk_invalid_total.inc(len(erros))
 
     if not cpfs_validos:
-        _m.trt3_mcp_calls_total.labels(tool="check_multiple_cpfs", result="invalid").inc()
+        _m.mcp_calls_total.labels(tool="check_multiple_cpfs", result="invalid").inc()
         return {"total": len(cpfs), "total_consultados": 0, "erros": erros,
                 "resultados": {}, "matches": {}}
 
@@ -183,7 +184,7 @@ async def check_multiple_cpfs(cpfs: list[str], workers: int = 8) -> dict:
     resultado["total"] = len(cpfs)
     resultado["erros"] = erros
     matches = len(resultado.get("matches", {}))
-    _m.trt3_mcp_calls_total.labels(tool="check_multiple_cpfs", result="success" if matches else "not_found").inc()
+    _m.mcp_calls_total.labels(tool="check_multiple_cpfs", result="success" if matches else "not_found").inc()
     if matches:
-        _m.trt3_matches_total.labels(type="mcp_multiplos").inc(matches)
+        _m.consulta_matches_total.labels(fonte=_cfg.SOURCE, type="mcp_multiplos").inc(matches)
     return resultado

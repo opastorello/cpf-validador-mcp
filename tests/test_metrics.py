@@ -38,14 +38,30 @@ def test_endpoint_responde_no_formato_prometheus(client):
 def test_metricas_do_projeto_estao_registradas(client):
     texto = _metrics(client)
     for nome in [
-        "trt3_queries_total",
+        # da consulta — valem para qualquer fonte e levam o label `fonte`
+        "consulta_queries_total",
+        "consulta_duration_seconds",
+        "consulta_feitos_total",
+        "consulta_matches_total",
+        # do scraping do TRT3 — não existem para uma fonte sem CAPTCHA
         "trt3_captcha_attempts_total",
-        "trt3_query_duration_seconds",
+        "trt3_pdf_parsed_total",
+        # da aplicação
         "cpf_validations_total",
         "cpf_mask_searches_total",
-        "trt3_mcp_calls_total",
+        "mcp_calls_total",
+        "http_rate_limit_total",
     ]:
         assert nome in texto, f"métrica ausente: {nome}"
+
+
+def test_metricas_de_consulta_tem_label_de_fonte(client):
+    """Sem o label, não dá para separar o desempenho de uma fonte da outra."""
+    from app.services.sources import consultar
+    consultar("15187982095", fonte="exemplo")
+    texto = _metrics(client)
+    assert 'consulta_queries_total{fonte="exemplo"' in texto
+    assert 'consulta_duration_seconds_count{fonte="exemplo"}' in texto
 
 
 def test_contador_sobe_de_fato(client):

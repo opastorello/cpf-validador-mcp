@@ -99,12 +99,12 @@ async def feitos(request: Request, body: CpfRequest):
         raise HTTPException(status_code=422, detail="CPF matematicamente inválido")
     result = await run_in_threadpool(consultar, cpf_limpo)
     if result.get("encontrado"):
-        _m.trt3_feitos_total.labels(result="found").inc()
-        _m.trt3_matches_total.labels(type="feitos").inc()
+        _m.consulta_feitos_total.labels(fonte=_cfg.SOURCE, result="found").inc()
+        _m.consulta_matches_total.labels(fonte=_cfg.SOURCE, type="feitos").inc()
     elif result.get("erro"):
-        _m.trt3_feitos_total.labels(result="error").inc()
+        _m.consulta_feitos_total.labels(fonte=_cfg.SOURCE, result="error").inc()
     else:
-        _m.trt3_feitos_total.labels(result="not_found").inc()
+        _m.consulta_feitos_total.labels(fonte=_cfg.SOURCE, result="not_found").inc()
     return result
 
 
@@ -152,7 +152,7 @@ async def feitos_multiplos(request: Request, body: FeitosMultiplosRequest):
     resultado["erros"] = erros
     matches = len(resultado.get("matches", {}))
     if matches:
-        _m.trt3_matches_total.labels(type="multiplos").inc(matches)
+        _m.consulta_matches_total.labels(fonte=_cfg.SOURCE, type="multiplos").inc(matches)
     return resultado
 
 
@@ -188,7 +188,7 @@ async def buscar_por_mascara(request: Request, body: BuscarMascaraRequest):
     resultado["candidatos_gerados"] = len(candidates)
     matches = len(resultado.get("matches", {}))
     if matches:
-        _m.trt3_matches_total.labels(type="mascara").inc(matches)
+        _m.consulta_matches_total.labels(fonte=_cfg.SOURCE, type="mascara").inc(matches)
     return resultado
 
 
@@ -296,7 +296,7 @@ async def buscar_por_variacoes(request: Request, body: BuscarVariacoesRequest):
     resultado["candidatos_gerados"] = len(candidates)
     matches = len(resultado.get("matches", {}))
     if matches:
-        _m.trt3_matches_total.labels(type="variacoes").inc(matches)
+        _m.consulta_matches_total.labels(fonte=_cfg.SOURCE, type="variacoes").inc(matches)
     return resultado
 
 

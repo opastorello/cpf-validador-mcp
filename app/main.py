@@ -71,7 +71,7 @@ def _custom_openapi():
 app.openapi = _custom_openapi
 
 def _rate_limit_handler(request, exc: RateLimitExceeded):
-    _m.trt3_rate_limit_total.labels(endpoint=request.url.path).inc()
+    _m.http_rate_limit_total.labels(endpoint=request.url.path).inc()
     return _rate_limit_exceeded_handler(request, exc)
 
 app.state.limiter = limiter
