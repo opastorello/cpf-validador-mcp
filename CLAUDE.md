@@ -45,6 +45,7 @@ app/
 │       ├── base.py     # ABC Fonte + contrato do retorno + mascarar_cpf (log)
 │       ├── __init__.py # Registro preguiçoso + busca em lote (agnóstica de fonte)
 │       ├── trt3.py     # TRT3: curl_cffi + CAPTCHA CRNN + pypdf
+│       ├── tcu.py      # TCU: API JSON + Altcha (PoW PBKDF2), sem pypdf
 │       └── exemplo.py  # Modelo para novas fontes — fictícia, sem rede e sem CAPTCHA
 ├── routers/
 │   ├── cpf.py        # POST /cpf/validate, POST /cpf/variations
@@ -112,10 +113,11 @@ app/
 `SOURCE` no .env escolhe quem responde "a quem pertence este CPF?". Registradas em
 `services/sources/__init__.py::_REGISTRO`:
 
-| `SOURCE` | Fonte |
-|----------|-------|
-| `trt3` (padrão) | TRT 3ª Região — scraping real com CAPTCHA |
-| `exemplo` | Dados fictícios, sem rede e sem CAPTCHA — modelo para novas fontes |
+| `SOURCE` | Fonte | Como consulta |
+|----------|-------|---------------|
+| `trt3` (padrão) | TRT 3ª Região (MG) | formulário JSF + CAPTCHA de imagem (CRNN) + PDF |
+| `tcu` | TCU, nacional | API JSON + CAPTCHA Altcha (proof-of-work PBKDF2) |
+| `exemplo` | Fictícia | nada — modelo para novas fontes |
 
 Cada fonte é dona do *como*: cliente HTTP, autenticação, CAPTCHA (ou nenhum), parsing e
 limite de conexões. A camada comum padroniza só o retorno — `cpf`, `encontrado`
@@ -139,8 +141,8 @@ Dois grupos, separados pelo que é conceito de consulta e o que é do scraping:
   (`consulta_queries_total`, `consulta_duration_seconds`, `consulta_feitos_total`,
   `consulta_matches_total`). São incrementadas num ponto só, em
   `sources/__init__.py::_consultar_medindo`, para toda fonte ser medida igual
-- `trt3_*` — CAPTCHA, PDF, resets de sessão e erros HTTP; não existem para uma
-  fonte sem CAPTCHA
+- `trt3_*` — CAPTCHA de imagem, PDF, resets de sessão e erros HTTP
+- `tcu_*` — duração e contador do proof-of-work, concorrência e erros HTTP
 - `cpf_*`, `mcp_calls_total`, `http_rate_limit_total` — da aplicação
 
 ### Logs da consulta

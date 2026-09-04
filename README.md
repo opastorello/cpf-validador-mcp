@@ -73,7 +73,8 @@ app/
 │   └── sources/        # Fontes de consulta — escolhidas por SOURCE no .env
 │       ├── base.py       # Contrato: ABC Fonte + formato do retorno
 │       ├── __init__.py   # Registro + busca em lote paralela (agnóstica de fonte)
-│       ├── trt3.py       # TRT3: curl_cffi + CAPTCHA solver + pypdf
+│       ├── trt3.py       # TRT3: curl_cffi + CAPTCHA de imagem (CRNN) + pypdf
+│       ├── tcu.py        # TCU: API JSON + CAPTCHA Altcha (proof-of-work)
 │       └── exemplo.py    # Modelo para novas fontes (fictícia, sem rede)
 ├── routers/
 │   ├── cpf.py          # POST /cpf/validate, POST /cpf/variations
@@ -99,10 +100,18 @@ app/
 A pergunta "a quem pertence este CPF?" é respondida por uma **fonte**. A fonte ativa vem de
 `SOURCE` no `.env`:
 
-| `SOURCE` | Fonte | Consulta rede? | CAPTCHA? |
-| -------- | ----- | :------------: | :------: |
-| `trt3` *(padrão)* | TRT 3ª Região | sim | sim, CRNN local |
-| `exemplo` | Dados fictícios | não | não |
+| `SOURCE` | Fonte | Abrangência | CAPTCHA |
+| -------- | ----- | ----------- | ------- |
+| `trt3` *(padrão)* | TRT 3ª Região — feitos trabalhistas | Minas Gerais | imagem, resolvida por CRNN local |
+| `tcu` | TCU — contas julgadas irregulares | Nacional | Altcha (proof-of-work) |
+| `exemplo` | Dados fictícios, não consulta nada | — | nenhum |
+
+As duas fontes reais não se parecem em nada por dentro, e é essa a prova de que a camada
+funciona: o TRT3 é um formulário JSF com `ViewState`, CAPTCHA de imagem e resposta em PDF;
+o TCU é uma API JSON cujo CAPTCHA é um **proof-of-work** — o cliente procura um contador
+cujo `PBKDF2-HMAC-SHA256` comece com um prefixo dado, gastando CPU em vez de visão
+computacional. Nenhum router, tool MCP ou a lógica de máscara precisou mudar para a
+segunda entrar.
 
 Cada fonte decide sozinha **como** consulta — cliente HTTP, autenticação, CAPTCHA ou a
 ausência dele, parsing da resposta e limite de conexões simultâneas. A camada comum
@@ -166,7 +175,10 @@ Todas as opções são lidas de variáveis de ambiente ou do arquivo `.env` na r
 | -------- | ------ | --------- |
 | `API_TOKEN` | *(vazio — sem auth)* | Token Bearer. Se vazio, todos os endpoints ficam abertos |
 | `ENV` | `development` | `development` ou `production` — controla quais rotas ficam abertas sem token |
-| `SOURCE` | `trt3` | Fonte consultada: `trt3` (real) ou `exemplo` (fictícia, não consulta nada) |
+| `SOURCE` | `trt3` | Fonte consultada: `trt3`, `tcu` ou `exemplo` |
+| `TCU_BASE_URL` | `https://certidoes.apps.tcu.gov.br` | Base da API do TCU |
+| `TCU_POW_MAX_COUNTER` | `200000` | Teto da busca do proof-of-work (na prática o contador fica abaixo de 5.000) |
+| `TCU_MAX_ATTEMPTS` | `3` | Tentativas por consulta ao TCU (o desafio vale ~90s e é de uso único) |
 | `TRT3_BASE_URL` | `https://certidao.trt3.jus.br` | URL base do site do TRT3 |
 | `TRT3_FORM_PATH` | `/certidao/feitosTrabalhistas/aba1.emissao.htm` | Path do formulário de consulta |
 | `HTTP_TIMEOUT` | `30` | Timeout (segundos) para requisições HTTP ao TRT3 |
