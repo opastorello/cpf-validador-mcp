@@ -2,14 +2,14 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from prometheus_fastapi_instrumentator import Instrumentator
 from app import metrics as _m
 from app.routers import consulta, cpf, ui
 from app.mcp_server import mcp
 from app.auth import TokenMiddleware
+from app.rate_limit import limiter
 from app.services import sources
 from app import config as _cfg
 
@@ -28,8 +28,6 @@ if _cfg.SOURCE not in _fontes:
         f"SOURCE={_cfg.SOURCE!r} não existe. Disponíveis: {', '.join(sorted(_fontes))}"
     )
 logging.getLogger("consulta").info("fonte configurada: %s — %s", _cfg.SOURCE, _fontes[_cfg.SOURCE])
-
-limiter = Limiter(key_func=get_remote_address)
 
 # FastMCP — endpoint will live at /mcp (no sub-mount, avoids 307 redirect)
 _mcp_app = mcp.http_app(path="/mcp")

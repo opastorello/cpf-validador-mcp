@@ -225,3 +225,13 @@ def test_multiplos_sem_nenhum_cpf_valido(client):
 def test_caminho_antigo_trt3_nao_existe_mais(client):
     """/trt3/* foi removido: os caminhos não citam mais a fonte."""
     assert client.post("/trt3/feitos", json={"cpf": "151.879.820-95"}).status_code == 404
+
+
+def test_limiter_e_o_mesmo_objeto_nas_duas_pontas(client):
+    """Os decoradores contam num limiter e o handler de 429 lê o de
+    app.state — se forem instâncias diferentes, cada uma tem o seu storage."""
+    from app.routers import consulta
+    from app.rate_limit import limiter
+
+    assert client.app.state.limiter is limiter
+    assert consulta.limiter is limiter

@@ -6,14 +6,11 @@ import json
 import re
 import threading
 from starlette.concurrency import run_in_threadpool
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 from app.services.cpf import is_valido, formatar, gerar_cpfs_de_mascara
 from app.services.sources import consultar, consultar_multiplos
+from app.rate_limit import limiter
 from app import config as _cfg
 from app import metrics as _m
-
-limiter = Limiter(key_func=get_remote_address)
 
 _EXAMPLE_CPF = {
     "cpf": "151.879.820-95",
