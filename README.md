@@ -150,7 +150,7 @@ Authorization: Bearer meu-token-secreto
 curl -X POST http://localhost:8000/trt3/feitos \
   -H "Authorization: Bearer meu-token-secreto" \
   -H "Content-Type: application/json" \
-  -d '{"cpf": "529.982.247-25"}'
+  -d '{"cpf": "111.444.777-35"}'
 ```
 
 **Claude Desktop / Claude Code (`claude_desktop_config.json`):**
@@ -206,7 +206,7 @@ Após iniciar:
 ```bash
 curl -X POST http://localhost:8000/cpf/validate \
   -H "Content-Type: application/json" \
-  -d '{"cpf": "529.982.247-25"}'
+  -d '{"cpf": "111.444.777-35"}'
 ```
 
 ### Confirmar titularidade
@@ -214,12 +214,12 @@ curl -X POST http://localhost:8000/cpf/validate \
 ```bash
 curl -X POST http://localhost:8000/trt3/feitos \
   -H "Content-Type: application/json" \
-  -d '{"cpf": "529.982.247-25"}'
+  -d '{"cpf": "111.444.777-35"}'
 ```
 
 ```json
 {
-  "cpf": "529.982.247-25",
+  "cpf": "111.444.777-35",
   "encontrado": true,
   "nome_certidao": "JOAO DA SILVA",
   "valida_ate": "18/04/2026",
@@ -246,7 +246,7 @@ O servidor gera todas as combinações válidas para as posições com `*`, cons
 ```bash
 curl -X POST http://localhost:8000/trt3/buscar-por-variacoes \
   -H "Content-Type: application/json" \
-  -d '{"cpf_parcial": "5299824725", "nome": "joao"}'
+  -d '{"cpf_parcial": "1114447773", "nome": "joao"}'
 ```
 
 ### Consulta em lote
@@ -254,7 +254,7 @@ curl -X POST http://localhost:8000/trt3/buscar-por-variacoes \
 ```bash
 curl -X POST http://localhost:8000/trt3/feitos-multiplos \
   -H "Content-Type: application/json" \
-  -d '{"cpfs": ["529.982.247-25", "111.444.777-35"], "workers": 4}'
+  -d '{"cpfs": ["111.444.777-35", "123.456.789-09"], "workers": 4}'
 ```
 
 ---

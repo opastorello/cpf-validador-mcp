@@ -5,8 +5,8 @@ from app import metrics as _m
 
 
 class CpfRequest(BaseModel):
-    model_config = {"json_schema_extra": {"example": {"cpf": "529.982.247-25"}}}
-    cpf: str = Field(..., description="CPF com ou sem formatação", examples=["529.982.247-25", "52998224725"])
+    model_config = {"json_schema_extra": {"example": {"cpf": "111.444.777-35"}}}
+    cpf: str = Field(..., description="CPF com ou sem formatação", examples=["111.444.777-35", "11144477735"])
 
 
 router = APIRouter(prefix="/cpf", tags=["cpf"])
@@ -18,8 +18,8 @@ router = APIRouter(prefix="/cpf", tags=["cpf"])
     description="Verifica se o CPF é válido pelo algoritmo módulo-11 (dígitos verificadores). Não consulta nenhum serviço externo.",
     responses={200: {"content": {"application/json": {"example": {
         "valido": True,
-        "cpf_formatado": "529.982.247-25",
-        "cpf_numeros": "52998224725",
+        "cpf_formatado": "111.444.777-35",
+        "cpf_numeros": "11144477735",
         "mensagem": "CPF válido.",
     }}}}},
 )
@@ -44,12 +44,12 @@ def validate(body: CpfRequest):
         "transpõe pares adjacentes. Útil para recuperar um CPF com um dígito digitado errado."
     ),
     responses={200: {"content": {"application/json": {"example": {
-        "original": "52998224725",
+        "original": "11144477735",
         "original_valido": True,
         "total_variacoes": 2,
         "variations": [
-            {"cpf_numeros": "52998224725", "cpf_formatado": "529.982.247-25"},
-            {"cpf_numeros": "52978224725", "cpf_formatado": "529.782.247-25"},
+            {"cpf_numeros": "11144477735", "cpf_formatado": "111.444.777-35"},
+            {"cpf_numeros": "11154477770", "cpf_formatado": "111.544.777-70"},
         ],
     }}}}},
 )
