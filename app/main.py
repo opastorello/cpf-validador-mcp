@@ -10,6 +10,7 @@ from app import metrics as _m
 from app.routers import cpf, trt3, ui
 from app.mcp_server import mcp
 from app.auth import TokenMiddleware
+from app.services import sources
 from app import config as _cfg
 
 logging.basicConfig(
@@ -17,6 +18,16 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)-7s %(name)s | %(message)s",
     datefmt="%H:%M:%S",
 )
+
+# Falha no boot, não na primeira consulta: um SOURCE errado no .env não pode
+# subir um container "healthy" que só devolve 500 quando alguém consulta.
+# Só valida o nome — não importa a fonte, para o registro seguir preguiçoso.
+_fontes = sources.fontes_disponiveis()
+if _cfg.SOURCE not in _fontes:
+    raise RuntimeError(
+        f"SOURCE={_cfg.SOURCE!r} não existe. Disponíveis: {', '.join(sorted(_fontes))}"
+    )
+logging.getLogger("consulta").info("fonte configurada: %s — %s", _cfg.SOURCE, _fontes[_cfg.SOURCE])
 
 limiter = Limiter(key_func=get_remote_address)
 

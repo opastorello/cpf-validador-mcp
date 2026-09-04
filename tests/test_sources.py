@@ -102,3 +102,15 @@ def test_registro_e_preguicoso():
     r = subprocess.run([sys.executable, "-c", codigo], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     assert "ok" in r.stdout
+
+
+def test_source_invalido_derruba_o_boot():
+    """Erro de digitação no .env tem de impedir a subida, não virar 500 na
+    primeira consulta com o container marcado como healthy."""
+    import os
+    env = {**os.environ, "SOURCE": "tribunal-que-nao-existe"}
+    r = subprocess.run([sys.executable, "-c", "import app.main"],
+                       capture_output=True, text=True, env=env)
+    assert r.returncode != 0
+    assert "SOURCE='tribunal-que-nao-existe' não existe" in r.stderr
+    assert "trt3" in r.stderr
