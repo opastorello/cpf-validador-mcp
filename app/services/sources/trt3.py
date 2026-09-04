@@ -64,10 +64,21 @@ def _post_form(session, action_url, viewstate, cpf_fmt, captcha_text):
     return session.post(action_url, data=data, headers=headers, timeout=_cfg.HTTP_TIMEOUT)
 
 
-def _extrair_dados_pdf(pdf_bytes: bytes) -> dict:
+def _texto_do_pdf(pdf_bytes: bytes) -> str:
     reader = PdfReader(io.BytesIO(pdf_bytes))
-    text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    return "\n".join(page.extract_text() or "" for page in reader.pages)
 
+
+def _extrair_dados_pdf(pdf_bytes: bytes) -> dict:
+    return _parse_texto_certidao(_texto_do_pdf(pdf_bytes))
+
+
+def _parse_texto_certidao(text: str) -> dict:
+    """Extrai os campos da certidão a partir do texto já tirado do PDF.
+
+    Separado de `_texto_do_pdf` para poder ser testado contra fixtures de
+    texto, sem versionar PDF de certidão real — que é dado pessoal.
+    """
     result = {}
 
     tipo_match = re.search(r"CERTID[ÃA]O\s+(NEGATIVA|POSITIVA)", text, re.IGNORECASE)

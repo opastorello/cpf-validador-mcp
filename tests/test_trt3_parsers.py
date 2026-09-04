@@ -9,7 +9,11 @@ formato, não o valor). É ela que detecta mudança de layout: se o TRT3 mexer n
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from app.services.sources.trt3 import _fetch_page, _parse_html_resultado
+from app.services.sources.trt3 import (
+    _fetch_page,
+    _parse_html_resultado,
+    _parse_texto_certidao,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FORM_HTML = (FIXTURES / "trt3_form.html").read_text(encoding="utf-8")
@@ -90,3 +94,40 @@ def test_resposta_desconhecida_fica_indeterminada():
     """Nem PDF nem frase conhecida: melhor devolver None do que chutar."""
     r = _parse_html_resultado("11144477735", "111.444.777-35", _resp("<html>algo inesperado</html>"))
     assert r["encontrado"] is None
+
+
+# ── _parse_texto_certidao ──────────────────────────────────────────────────
+#
+# As fixtures reproduzem a estrutura real do PDF do TRT3 (quebras de linha,
+# ordem dos blocos, "Certidão n." seguida do código de autenticidade numa linha
+# e do número noutra) com nome e CPF fictícios. O PDF real não pode ser
+# versionado: é dado pessoal de terceiro.
+
+NEGATIVA = (FIXTURES / "certidao_negativa.txt").read_text(encoding="utf-8")
+POSITIVA = (FIXTURES / "certidao_positiva.txt").read_text(encoding="utf-8")
+
+
+def test_certidao_negativa():
+    d = _parse_texto_certidao(NEGATIVA)
+    assert d["tipo_certidao"] == "NEGATIVA"
+    assert d["tem_feitos"] is False
+    assert d["nome_certidao"] == "FULANO DE TAL"
+    assert d["valida_ate"] == "03/10/2026"
+    assert d["numero_certidao"] == "1195030/2026"
+
+
+def test_certidao_positiva_marca_tem_feitos():
+    d = _parse_texto_certidao(POSITIVA)
+    assert d["tipo_certidao"] == "POSITIVA"
+    assert d["tem_feitos"] is True
+
+
+def test_numero_da_certidao_pula_o_codigo_de_autenticidade():
+    """O layout é 'Certidão n.' / <código> / <número>/<ano>: o parser tem de
+    pegar a segunda linha, não o código."""
+    assert _parse_texto_certidao(NEGATIVA)["numero_certidao"] == "1195030/2026"
+    assert "RJJN" not in _parse_texto_certidao(NEGATIVA)["numero_certidao"]
+
+
+def test_texto_vazio_nao_quebra():
+    assert _parse_texto_certidao("") == {"tem_feitos": False}
