@@ -59,28 +59,28 @@ def test_marcador_do_handler_existe():
 @node
 def test_todos_os_curingas_viram_asterisco():
     entradas = [
-        "***444777**", "XXX444777XX", "xxx444777xx",
-        "???444777??", "___444777__", "###444777##", "*X?444777_#",
+        "***879820**", "XXX879820XX", "xxx879820xx",
+        "???879820??", "___879820__", "###879820##", "*X?879820_#",
     ]
     saidas = _rodar_no_node(entradas)
-    assert saidas == ["***.444.777-**"] * len(entradas), saidas
+    assert saidas == ["***.879.820-**"] * len(entradas), saidas
 
 
 @node
 def test_formata_enquanto_digita():
-    assert _rodar_no_node(["111", "111444", "111444777", "11144477735"]) == [
-        "111", "111.444", "111.444.777", "111.444.777-35",
+    assert _rodar_no_node(["151", "151879", "151879820", "15187982095"]) == [
+        "151", "151.879", "151.879.820", "151.879.820-95",
     ]
 
 
 @node
 def test_descarta_letras_e_limita_a_11_posicoes():
-    assert _rodar_no_node(["AAA444777BB"]) == ["444.777"]
-    assert _rodar_no_node(["1114447773599999"]) == ["111.444.777-35"]
+    assert _rodar_no_node(["AAA879820BB"]) == ["879.820"]
+    assert _rodar_no_node(["1518798209599999"]) == ["151.879.820-95"]
 
 
 @node
 def test_separadores_digitados_nao_duplicam():
-    assert _rodar_no_node(["111.444.777-35", "111 444 777 35"]) == [
-        "111.444.777-35", "111.444.777-35",
+    assert _rodar_no_node(["151.879.820-95", "151 879 820 95"]) == [
+        "151.879.820-95", "151.879.820-95",
     ]

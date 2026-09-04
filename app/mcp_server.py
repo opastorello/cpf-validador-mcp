@@ -61,8 +61,8 @@ async def find_cpf_by_mask(mascara: str, nome: str | None = None, workers: int =
     Args:
         mascara: CPF com curingas nos dígitos desconhecidos. Curingas equivalentes: * X x ? _ #
             Separadores (. - / espaço) são ignorados e os dígitos verificadores podem ser omitidos,
-            então '***.444.777-**', '***444777**', '___.444.777-__' e '***.444.777' são a mesma máscara.
-            Ex: '11X.593.91X-00', '***.587.570-**', '111.444.777'
+            então '***.879.820-**', '***879820**', '___.879.820-__' e '***.879.820' são a mesma máscara.
+            Ex: '15X.879.82X-95', '***.879.820-**', '151.879.820'
         nome: nome ou parte do nome para filtrar (ex: 'Italvino Rebelatto')
         workers: número de threads paralelas (padrão 8)
     """

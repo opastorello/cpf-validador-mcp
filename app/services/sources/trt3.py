@@ -91,7 +91,7 @@ def _parse_texto_certidao(text: str) -> dict:
     if nome_match:
         result["nome_certidao"] = nome_match.group(1).strip()
 
-    # O texto real é "...no CPF sob o nº 111.444.777-35." — o padrão antigo
+    # O texto real é "...no CPF sob o nº 151.879.820-95." — o padrão antigo
     # exigia o CPF logo após "CPF" e por isso nunca casava.
     cpf_match = re.search(r"CPF[^\d]{0,30}([\d]{3}\.[\d]{3}\.[\d]{3}-[\d]{2})", text)
     if cpf_match:

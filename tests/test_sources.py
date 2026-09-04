@@ -15,8 +15,8 @@ from app.services.sources import (
 )
 from app.services.sources.base import Fonte
 
-CPF_COM_REGISTRO = "11144477735"   # soma 44, par  → a fonte de exemplo "acha"
-CPF_SEM_REGISTRO = "11144477905"   # soma 43, ímpar → a fonte de exemplo "não acha"
+CPF_COM_REGISTRO = "15187982508"   # soma 54, par   → a fonte de exemplo "acha"
+CPF_SEM_REGISTRO = "15187982095"   # soma 55, ímpar → a fonte de exemplo "não acha"
 
 
 def test_fontes_disponiveis_lista_registro():
@@ -46,7 +46,7 @@ def test_exemplo_cumpre_o_contrato():
     assert isinstance(fonte, Fonte)
 
     achado = fonte.consultar(CPF_COM_REGISTRO)
-    assert achado["cpf"] == "111.444.777-35"
+    assert achado["cpf"] == "151.879.825-08"
     assert achado["encontrado"] is True
     assert achado["nome_certidao"]
     assert achado["fonte"] == "exemplo"

@@ -16,62 +16,62 @@ from app import metrics as _m
 limiter = Limiter(key_func=get_remote_address)
 
 _EXAMPLE_FEITO = {
-    "cpf": "111.444.777-35",
+    "cpf": "151.879.820-95",
     "encontrado": True,
     "nome_certidao": "JOAO DA SILVA",
     "tipo_certidao": "NEGATIVA",
     "tem_feitos": False,
-    "cpf_certidao": "111.444.777-35",
+    "cpf_certidao": "151.879.820-95",
     "valida_ate": "18/04/2026",
     "numero_certidao": "511684/2026",
 }
 
 _EXAMPLE_MULTIPLOS = {
     "total": 2,
-    "matches": {"11144477735": _EXAMPLE_FEITO},
+    "matches": {"15187982095": _EXAMPLE_FEITO},
     "resultados": {
-        "11144477735": _EXAMPLE_FEITO,
-        "12345678909": {"cpf": "123.456.789-09", "encontrado": False, "mensagem": "Nenhum feito trabalhista encontrado."},
+        "15187982095": _EXAMPLE_FEITO,
+        "15187982176": {"cpf": "151.879.821-76", "encontrado": False, "mensagem": "Nenhum feito trabalhista encontrado."},
     },
     "erros": {},
 }
 
 _EXAMPLE_MASCARA = {
     "total": 3,
-    "matches": {"11144477735": _EXAMPLE_FEITO},
-    "resultados": {"11144477735": _EXAMPLE_FEITO},
+    "matches": {"15187982095": _EXAMPLE_FEITO},
+    "resultados": {"15187982095": _EXAMPLE_FEITO},
     "candidatos_gerados": 3,
 }
 
 _EXAMPLE_VARIACOES = {
     "total": 4,
-    "matches": {"11144477735": _EXAMPLE_FEITO},
-    "resultados": {"11144477735": _EXAMPLE_FEITO},
+    "matches": {"15187982095": _EXAMPLE_FEITO},
+    "resultados": {"15187982095": _EXAMPLE_FEITO},
     "candidatos_gerados": 4,
 }
 
 
 class CpfRequest(BaseModel):
-    model_config = {"json_schema_extra": {"example": {"cpf": "111.444.777-35"}}}
-    cpf: str = Field(..., description="CPF com ou sem formatação (pontos e traço opcionais)", examples=["111.444.777-35", "11144477735"])
+    model_config = {"json_schema_extra": {"example": {"cpf": "151.879.820-95"}}}
+    cpf: str = Field(..., description="CPF com ou sem formatação (pontos e traço opcionais)", examples=["151.879.820-95", "15187982095"])
 
 
 class BuscarVariacoesRequest(BaseModel):
-    model_config = {"json_schema_extra": {"example": {"cpf_parcial": "1114447773", "nome": "joao"}}}
-    cpf_parcial: str = Field(..., description="CPF com 9 a 11 dígitos, podendo ter erros ou estar incompleto", examples=["1114447773", "111444777"])
+    model_config = {"json_schema_extra": {"example": {"cpf_parcial": "1518798209", "nome": "joao"}}}
+    cpf_parcial: str = Field(..., description="CPF com 9 a 11 dígitos, podendo ter erros ou estar incompleto", examples=["1518798209", "151879820"])
     nome: str | None = Field(None, description="Fragmento do nome para filtrar os resultados (opcional, case-insensitive)", examples=["joao", "Maria Silva"])
     workers: int = Field(default=_cfg.DEFAULT_WORKERS, ge=1, le=_cfg.MAX_WORKERS, description=f"Threads paralelas para consulta ao TRT3 (1–{_cfg.MAX_WORKERS})")
 
 
 class FeitosMultiplosRequest(BaseModel):
-    model_config = {"json_schema_extra": {"example": {"cpfs": ["111.444.777-35", "123.456.789-09"], "workers": 4}}}
-    cpfs: list[str] = Field(..., description="Lista de CPFs (com ou sem formatação)", examples=[["111.444.777-35", "123.456.789-09"]])
+    model_config = {"json_schema_extra": {"example": {"cpfs": ["151.879.820-95", "151.879.821-76"], "workers": 4}}}
+    cpfs: list[str] = Field(..., description="Lista de CPFs (com ou sem formatação)", examples=[["151.879.820-95", "151.879.821-76"]])
     workers: int = Field(default=_cfg.DEFAULT_WORKERS, ge=1, le=_cfg.MAX_WORKERS, description=f"Threads paralelas para consulta ao TRT3 (1–{_cfg.MAX_WORKERS})")
 
 
 class BuscarMascaraRequest(BaseModel):
-    model_config = {"json_schema_extra": {"example": {"mascara": "***.444.777-**", "nome": "joao"}}}
-    mascara: str = Field(..., description=f"CPF com curingas nos dígitos desconhecidos. Aceita `*`, `X`, `x`, `?`, `_` e `#` (equivalentes) e qualquer separador — `.`, `-`, `/` ou espaço — inclusive nenhum. Os dígitos verificadores podem ser omitidos. Máximo de {_cfg.MAX_WILDCARDS_IN_MASK} curingas na parte base (posições 0–8)", examples=["11X.593.91X-00", "***.444.777-**", "111.444.___-35", "111.444.777"])
+    model_config = {"json_schema_extra": {"example": {"mascara": "***.879.820-**", "nome": "joao"}}}
+    mascara: str = Field(..., description=f"CPF com curingas nos dígitos desconhecidos. Aceita `*`, `X`, `x`, `?`, `_` e `#` (equivalentes) e qualquer separador — `.`, `-`, `/` ou espaço — inclusive nenhum. Os dígitos verificadores podem ser omitidos. Máximo de {_cfg.MAX_WILDCARDS_IN_MASK} curingas na parte base (posições 0–8)", examples=["15X.879.82X-95", "***.879.820-**", "151.879.___-95", "151.879.820"])
     nome: str | None = Field(None, description="Fragmento do nome para filtrar os resultados (opcional, case-insensitive)", examples=["joao", "Maria Silva"])
     workers: int = Field(default=_cfg.DEFAULT_WORKERS, ge=1, le=_cfg.MAX_WORKERS, description=f"Threads paralelas para consulta ao TRT3 (1–{_cfg.MAX_WORKERS})")
 
@@ -154,8 +154,8 @@ async def feitos_multiplos(request: Request, body: FeitosMultiplosRequest):
         "Recebe uma máscara de CPF com curingas nos dígitos desconhecidos, gera todas as combinações "
         "matematicamente válidas e consulta o TRT3 em paralelo. "
         "Curingas equivalentes: `*`, `X`, `x`, `?`, `_`, `#`. Separadores (`.`, `-`, `/`, espaço) são "
-        "ignorados e os dígitos verificadores podem ser omitidos — `***.444.777-**`, `***444777**` e "
-        "`___.444.777` são a mesma máscara. "
+        "ignorados e os dígitos verificadores podem ser omitidos — `***.879.820-**`, `***879820**` e "
+        "`___.879.820` são a mesma máscara. "
         "Se `nome` for informado, filtra somente os resultados que contenham o nome. "
         f"Máximo de {_cfg.MAX_WILDCARDS_IN_MASK} wildcards na parte base (posições 0–8) para evitar explosão combinatória."
     ),

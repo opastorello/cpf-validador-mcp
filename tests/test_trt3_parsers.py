@@ -68,14 +68,14 @@ def _resp(html: str):
 
 def test_resultado_com_link_de_pdf():
     html = '<html><a href="/certidao/arquivos/certidao_123.pdf">baixar</a></html>'
-    r = _parse_html_resultado("11144477735", "111.444.777-35", _resp(html))
+    r = _parse_html_resultado("15187982095", "151.879.820-95", _resp(html))
     assert r["encontrado"] is True
     assert r["pdf_url"] == "https://certidao.trt3.jus.br/certidao/arquivos/certidao_123.pdf"
 
 
 def test_pdf_com_url_absoluta_nao_e_prefixada():
     html = '<html><a href="https://certidao.trt3.jus.br/x/certidao_9.pdf">baixar</a></html>'
-    r = _parse_html_resultado("11144477735", "111.444.777-35", _resp(html))
+    r = _parse_html_resultado("15187982095", "151.879.820-95", _resp(html))
     assert r["pdf_url"].count("https://") == 1
 
 
@@ -86,13 +86,13 @@ def test_resultado_sem_feitos():
         "CERTIDÃO NEGATIVA de feitos",
         "não há feitos em nome do requerente",
     ]:
-        r = _parse_html_resultado("11144477735", "111.444.777-35", _resp(f"<html>{texto}</html>"))
+        r = _parse_html_resultado("15187982095", "151.879.820-95", _resp(f"<html>{texto}</html>"))
         assert r["encontrado"] is False, texto
 
 
 def test_resposta_desconhecida_fica_indeterminada():
     """Nem PDF nem frase conhecida: melhor devolver None do que chutar."""
-    r = _parse_html_resultado("11144477735", "111.444.777-35", _resp("<html>algo inesperado</html>"))
+    r = _parse_html_resultado("15187982095", "151.879.820-95", _resp("<html>algo inesperado</html>"))
     assert r["encontrado"] is None
 
 
@@ -134,6 +134,6 @@ def test_texto_vazio_nao_quebra():
 
 
 def test_cpf_da_certidao_e_extraido():
-    """O texto real é '...no CPF sob o nº 111.444.777-35.' — havia palavras
+    """O texto real é '...no CPF sob o nº 151.879.820-95.' — havia palavras
     entre 'CPF' e o número, e o padrão antigo exigia que fossem adjacentes."""
-    assert _parse_texto_certidao(NEGATIVA)["cpf_certidao"] == "111.444.777-35"
+    assert _parse_texto_certidao(NEGATIVA)["cpf_certidao"] == "151.879.820-95"

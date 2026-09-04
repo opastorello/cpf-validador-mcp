@@ -125,7 +125,7 @@ O contrato do retorno é este — só estas chaves são interpretadas:
 
 ```python
 {
-    "cpf": "111.444.777-35",       # obrigatório, formatado
+    "cpf": "151.879.820-95",       # obrigatório, formatado
     "encontrado": True,            # True achou | False não consta | None erro
     "nome_certidao": "FULANO",     # o filtro nome= das buscas em lote depende desta chave
     "erro": "...",                 # só quando a consulta falhou
@@ -200,7 +200,7 @@ Authorization: Bearer meu-token-secreto
 curl -X POST http://localhost:8000/trt3/feitos \
   -H "Authorization: Bearer meu-token-secreto" \
   -H "Content-Type: application/json" \
-  -d '{"cpf": "111.444.777-35"}'
+  -d '{"cpf": "151.879.820-95"}'
 ```
 
 **Claude Desktop / Claude Code (`claude_desktop_config.json`):**
@@ -256,7 +256,7 @@ Após iniciar:
 ```bash
 curl -X POST http://localhost:8000/cpf/validate \
   -H "Content-Type: application/json" \
-  -d '{"cpf": "111.444.777-35"}'
+  -d '{"cpf": "151.879.820-95"}'
 ```
 
 ### Confirmar titularidade
@@ -264,12 +264,12 @@ curl -X POST http://localhost:8000/cpf/validate \
 ```bash
 curl -X POST http://localhost:8000/trt3/feitos \
   -H "Content-Type: application/json" \
-  -d '{"cpf": "111.444.777-35"}'
+  -d '{"cpf": "151.879.820-95"}'
 ```
 
 ```json
 {
-  "cpf": "111.444.777-35",
+  "cpf": "151.879.820-95",
   "encontrado": true,
   "nome_certidao": "JOAO DA SILVA",
   "valida_ate": "18/04/2026",
@@ -292,14 +292,14 @@ O servidor gera todas as combinações válidas para as posições curinga, cons
 **Formatos de máscara aceitos.** Os curingas `*`, `X`, `x`, `?`, `_` e `#` são equivalentes, os separadores `.`, `-`, `/` e espaços são ignorados (inclusive nenhum separador), e os dígitos verificadores podem ser omitidos. Todas estas máscaras são a mesma coisa:
 
 ```
-***.444.777-**      ← mascaramento LGPD de documento público
-***444777**         ← sem separador
-*** 444 777 **      ← separado por espaço
-XXX.444.777-XX      ← anotação manual
-???.444.777-??
-___.444.777-__      ← campo de formulário
-###.444.777-##      ← planilha
-***.444.777         ← dígitos verificadores omitidos
+***.879.820-**      ← mascaramento LGPD de documento público
+***879820**         ← sem separador
+*** 879 820 **      ← separado por espaço
+XXX.879.820-XX      ← anotação manual
+???.879.820-??
+___.879.820-__      ← campo de formulário
+###.879.820-##      ← planilha
+***.879.820         ← dígitos verificadores omitidos
 ```
 
 Um caractere que não seja dígito, curinga ou separador é rejeitado com `422` apontando qual é — em vez de ser descartado silenciosamente e virar erro de tamanho.
@@ -311,7 +311,7 @@ Um caractere que não seja dígito, curinga ou separador é rejeitado com `422` 
 ```bash
 curl -X POST http://localhost:8000/trt3/buscar-por-variacoes \
   -H "Content-Type: application/json" \
-  -d '{"cpf_parcial": "1114447773", "nome": "joao"}'
+  -d '{"cpf_parcial": "1518798209", "nome": "joao"}'
 ```
 
 ### Consulta em lote
@@ -319,7 +319,7 @@ curl -X POST http://localhost:8000/trt3/buscar-por-variacoes \
 ```bash
 curl -X POST http://localhost:8000/trt3/feitos-multiplos \
   -H "Content-Type: application/json" \
-  -d '{"cpfs": ["111.444.777-35", "123.456.789-09"], "workers": 4}'
+  -d '{"cpfs": ["151.879.820-95", "151.879.821-76"], "workers": 4}'
 ```
 
 ---

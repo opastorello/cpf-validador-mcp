@@ -28,7 +28,7 @@ def client():
 
 
 MOCK_FEITOS = {
-    "cpf": "11144477735",
+    "cpf": "15187982095",
     "encontrado": False,
     "processos": [],
 }
@@ -49,10 +49,10 @@ def test_health(client):
 # ---------------------------------------------------------------------------
 
 def test_cpf_validate_valido(client):
-    r = client.post("/cpf/validate", json={"cpf": "111.444.777-35"})
+    r = client.post("/cpf/validate", json={"cpf": "151.879.820-95"})
     assert r.status_code == 200
     data = r.json()
-    assert data["cpf_numeros"] == "11144477735"
+    assert data["cpf_numeros"] == "15187982095"
     assert data["valido"] is True
 
 
@@ -71,7 +71,7 @@ def test_cpf_validate_payload_invalido(client):
 # ---------------------------------------------------------------------------
 
 def test_cpf_variations(client):
-    r = client.post("/cpf/variations", json={"cpf": "111.444.777-35"})
+    r = client.post("/cpf/variations", json={"cpf": "151.879.820-95"})
     assert r.status_code == 200
     data = r.json()
     assert "variations" in data
@@ -94,9 +94,9 @@ def test_trt3_feitos_cpf_curto(client):
 
 def test_trt3_feitos_sucesso(client):
     with patch("app.routers.trt3.consultar", return_value=MOCK_FEITOS):
-        r = client.post("/trt3/feitos", json={"cpf": "111.444.777-35"})
+        r = client.post("/trt3/feitos", json={"cpf": "151.879.820-95"})
     assert r.status_code == 200
-    assert r.json()["cpf"] == "11144477735"
+    assert r.json()["cpf"] == "15187982095"
 
 
 def test_trt3_feitos_payload_invalido(client):
@@ -113,7 +113,7 @@ def test_auth_sem_api_token_configurado(client):
     r = client.get("/health")
     assert r.status_code == 200
 
-    r = client.post("/cpf/validate", json={"cpf": "111.444.777-35"})
+    r = client.post("/cpf/validate", json={"cpf": "151.879.820-95"})
     assert r.status_code == 200
 
 
@@ -153,18 +153,18 @@ def test_auth_com_api_token(monkeypatch):
         assert c.get("/metrics").status_code == 401
 
         # sem token → 401
-        r = c.post("/cpf/validate", json={"cpf": "111.444.777-35"})
+        r = c.post("/cpf/validate", json={"cpf": "151.879.820-95"})
         assert r.status_code == 401
 
         # token errado → 401
         r = c.post("/cpf/validate",
-                   json={"cpf": "111.444.777-35"},
+                   json={"cpf": "151.879.820-95"},
                    headers={"Authorization": "Bearer errado"})
         assert r.status_code == 401
 
         # token correto → passa para o handler
         r = c.post("/cpf/validate",
-                   json={"cpf": "111.444.777-35"},
+                   json={"cpf": "151.879.820-95"},
                    headers={"Authorization": "Bearer test-secret"})
         assert r.status_code == 200
 
@@ -182,13 +182,13 @@ def test_buscar_por_mascara_aceita_formato_alternativo(client):
         return {"total": len(candidatos), "matches": {}, "resultados": {}}
 
     with patch("app.routers.trt3.consultar_multiplos", side_effect=_fake):
-        r = client.post("/trt3/buscar-por-mascara", json={"mascara": "___.444.777-__"})
+        r = client.post("/trt3/buscar-por-mascara", json={"mascara": "___.879.820-__"})
 
     assert r.status_code == 200
-    assert "11144477735" in capturado["candidatos"]
+    assert "15187982095" in capturado["candidatos"]
 
 
 def test_buscar_por_mascara_caractere_invalido(client):
-    r = client.post("/trt3/buscar-por-mascara", json={"mascara": "111.444.77A-35"})
+    r = client.post("/trt3/buscar-por-mascara", json={"mascara": "151.879.82A-95"})
     assert r.status_code == 422
     assert "Caractere inválido" in r.json()["detail"]

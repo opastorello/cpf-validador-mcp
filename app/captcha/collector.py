@@ -182,7 +182,7 @@ def run_collector(target: int = 1000, delay: float = 1.0, workers: int = 1, cpf:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cpf", type=str, required=True, help="CPF válido usado como probe (ex: 111.444.777-35)")
+    parser.add_argument("--cpf", type=str, required=True, help="CPF válido usado como probe (ex: 151.879.820-95)")
     parser.add_argument("--target", type=int, default=1000)
     parser.add_argument("--delay", type=float, default=1.0)
     parser.add_argument("--workers", type=int, default=1)

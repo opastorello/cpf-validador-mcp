@@ -516,7 +516,7 @@ _HTML = r"""<!DOCTYPE html>
           <label>CPF</label>
           <input id="cpf" type="text" placeholder="000.000.000-00"
                  spellcheck="false" autocomplete="off" inputmode="tel" />
-          <p class="hint">Dígito ilegível? Use <code>*</code>, <code>X</code>, <code>?</code>, <code>_</code> ou <code>#</code> — ex: <code>***.444.777-**</code></p>
+          <p class="hint">Dígito ilegível? Use <code>*</code>, <code>X</code>, <code>?</code>, <code>_</code> ou <code>#</code> — ex: <code>***.879.820-**</code></p>
         </div>
         <div class="field">
           <label>Nome <span style="font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span></label>

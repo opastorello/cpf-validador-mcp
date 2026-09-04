@@ -41,9 +41,9 @@ def validate_cpf(cpf: str) -> dict:
 
 
 # Curingas aceitos numa máscara — cobrem os formatos que aparecem na prática:
-# mascaramento LGPD de documentos públicos (***.444.777-**), campo de formulário
-# (111.444.___-35), planilha (111.444.###-35) e anotação manual (11X.593.91X-00,
-# 111.444.???-35).
+# mascaramento LGPD de documentos públicos (***.879.820-**), campo de formulário
+# (151.879.___-95), planilha (151.879.###-95) e anotação manual (15X.879.82X-95,
+# 151.879.???-95).
 _MASK_WILDCARDS = "*Xx?_#"
 
 # Separadores ignorados em qualquer posição — inclui o espaço não-quebrável, que
@@ -74,7 +74,7 @@ def _normalizar_mascara(mascara: str) -> list[str]:
                 f"curingas ({' '.join(_MASK_WILDCARDS)}) ou separadores (. - / espaço)"
             )
 
-    # DVs omitidos viram curinga: '111.444.777' e '111.444.777-3' são máscaras válidas
+    # DVs omitidos viram curinga: '151.879.820' e '151.879.820-9' são máscaras válidas
     if len(chars) in (9, 10):
         chars += ["*"] * (11 - len(chars))
 
@@ -92,7 +92,7 @@ def gerar_cpfs_de_mascara(mascara: str) -> list[str]:
 
     Curingas equivalentes: ``* X x ? _ #``
     Separadores ignorados: ponto, hífen, barra, contrabarra e espaços — de modo que
-    ``***.444.777-**``, ``***444777**`` e ``*** 444 777 **`` são a mesma máscara.
+    ``***.879.820-**``, ``***879820**`` e ``*** 879 820 **`` são a mesma máscara.
 
     Os dígitos verificadores (posições 10-11) são sempre recalculados; quando
     informados na máscara, funcionam como filtro dos candidatos.

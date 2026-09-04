@@ -37,20 +37,20 @@ def test_pagina_sem_captcha_loga_erro_de_layout(caplog):
     silencioso, porque nenhuma tentativa vai resolver."""
     with caplog.at_level(logging.ERROR, logger="trt3"):
         with patch.object(m, "_fetch_page", return_value=("http://x", "vs", "")):
-            r = m._consultar_trt3_com_sessao("11144477735", "111.444.777-35")
+            r = m._consultar_trt3_com_sessao("15187982095", "151.879.820-95")
 
     assert r["encontrado"] is None
     assert "CAPTCHA URL não encontrada" in r["erro"]
     texto = "\n".join(x.getMessage() for x in caplog.records)
     assert "layout mudou?" in texto
-    assert "111.***.***-35" in texto      # mascarado também no erro
+    assert "151.***.***-95" in texto      # mascarado também no erro
 
 
 def test_excecao_na_tentativa_vira_warning(caplog):
     """Antes o `except Exception: continue` engolia isto sem deixar rastro."""
     with caplog.at_level(logging.WARNING, logger="trt3"):
         with patch.object(m, "_fetch_page", side_effect=ConnectionError("conexão recusada")):
-            r = m._consultar_trt3_com_sessao("11144477735", "111.444.777-35")
+            r = m._consultar_trt3_com_sessao("15187982095", "151.879.820-95")
 
     texto = "\n".join(x.getMessage() for x in caplog.records)
     assert "ConnectionError" in texto          # o tipo da exceção aparece
@@ -62,10 +62,10 @@ def test_excecao_na_tentativa_vira_warning(caplog):
 def test_tentativas_esgotadas_loga_desistencia(caplog):
     with caplog.at_level(logging.ERROR, logger="trt3"):
         with patch.object(m, "_fetch_page", side_effect=TimeoutError("estourou")):
-            r = m._consultar_trt3_com_sessao("11144477735", "111.444.777-35")
+            r = m._consultar_trt3_com_sessao("15187982095", "151.879.820-95")
 
     texto = "\n".join(x.getMessage() for x in caplog.records)
-    assert "desisti de cpf=111.***.***-35 após 2 tentativas" in texto
+    assert "desisti de cpf=151.***.***-95 após 2 tentativas" in texto
     assert "CAPTCHA não resolvido após 2 tentativas" in r["erro"]
 
 
@@ -77,7 +77,7 @@ def test_pdf_ilegivel_loga_warning_mas_nao_perde_o_resultado(caplog):
         with patch.object(m, "_fetch_page", return_value=("http://x", "vs", "http://c")), \
              patch.object(m, "_solve_captcha", return_value="abc123"), \
              patch.object(m, "_post_form", return_value=resp):
-            r = m._consultar_trt3_com_sessao("11144477735", "111.444.777-35")
+            r = m._consultar_trt3_com_sessao("15187982095", "151.879.820-95")
 
     assert r["encontrado"] is True
     assert "PDF recebido mas ilegível" in "\n".join(x.getMessage() for x in caplog.records)
@@ -90,7 +90,7 @@ def test_captcha_errado_reabre_sessao_e_tenta_de_novo(caplog):
         with patch.object(m, "_fetch_page", return_value=("http://x", "vs", "http://c")), \
              patch.object(m, "_solve_captcha", return_value="errad"), \
              patch.object(m, "_post_form", return_value=devolveu_formulario):
-            r = m._consultar_trt3_com_sessao("11144477735", "111.444.777-35")
+            r = m._consultar_trt3_com_sessao("15187982095", "151.879.820-95")
 
     texto = "\n".join(x.getMessage() for x in caplog.records)
     assert "rejeitado" in texto

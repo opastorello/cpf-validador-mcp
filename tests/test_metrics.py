@@ -57,7 +57,7 @@ def test_contador_sobe_de_fato(client):
         return 0.0
 
     antes = valor()
-    client.post("/cpf/validate", json={"cpf": "111.444.777-35"})
+    client.post("/cpf/validate", json={"cpf": "151.879.820-95"})
     assert valor() == antes + 1
 
 
