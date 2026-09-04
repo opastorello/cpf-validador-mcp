@@ -106,3 +106,17 @@ def test_html_injeta_a_capacidade_de_captcha(monkeypatch):
     html_exemplo = _com("exemplo")
     assert "const USA_CAPTCHA   = false;" in html_exemplo
     assert "__USA_CAPTCHA__" not in html_exemplo   # placeholder foi substituído
+
+
+def test_html_mostra_a_fonte_ativa(monkeypatch):
+    """Com as mensagens padronizadas, o rótulo da fonte é a única pista de onde
+    o resultado veio."""
+    import asyncio
+
+    import app.routers.ui as ui_mod
+    from app.services.sources import get_fonte
+
+    monkeypatch.setattr(ui_mod, "get_fonte", lambda *a, **k: get_fonte("exemplo"))
+    html = asyncio.run(ui_mod.ui())
+    assert "Fonte de exemplo" in html
+    assert "__FONTE_ROTULO__" not in html

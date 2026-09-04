@@ -1,3 +1,5 @@
+from html import escape
+
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 from app.auth import _TOKEN
@@ -577,6 +579,7 @@ _HTML = r"""<!DOCTYPE html>
       </svg>
       opastorello/cpf-validador
     </a>
+    <div style="margin-top:8px;">Consultando: <span id="fonte-ativa">__FONTE_ROTULO__</span></div>
   </footer>
 
   <script>
@@ -1206,6 +1209,8 @@ async def ui():
     auth_required = "true" if _TOKEN else "false"
     # A fonte ativa é importada aqui na primeira carga da página; seria
     # importada de todo jeito na primeira consulta.
-    usa_captcha = "true" if get_fonte().usa_captcha else "false"
+    fonte = get_fonte()
+    usa_captcha = "true" if fonte.usa_captcha else "false"
     return (_HTML.replace("__AUTH_REQUIRED__", auth_required)
-                 .replace("__USA_CAPTCHA__", usa_captcha))
+                 .replace("__USA_CAPTCHA__", usa_captcha)
+                 .replace("__FONTE_ROTULO__", escape(fonte.rotulo)))
