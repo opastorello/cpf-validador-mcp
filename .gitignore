@@ -26,3 +26,6 @@ build/
 *.bat
 claude_debug.log
 
+
+# Scripts temporários de refatoração
+_*.py
