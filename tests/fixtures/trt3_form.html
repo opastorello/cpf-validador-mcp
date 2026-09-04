@@ -1,0 +1,119 @@
+<?xml version='1.0' encoding='ISO-8859-1' ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"><head>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="SKYPE_TOOLBAR" content="SKYPE_TOOLBAR_PARSER_COMPATIBLE" /><link type="text/css" rel="stylesheet" href="/certidao/javax.faces.resource/theme.css.htm?ln=primefaces-bootstrap" /><script type="text/javascript" src="/certidao/javax.faces.resource/jquery/jquery.js.htm;jsessionid=SESSAO_REDIGIDA?ln=primefaces&amp;v=4.0"></script><link type="text/css" rel="stylesheet" href="/certidao/javax.faces.resource/primefaces.css.htm;jsessionid=SESSAO_REDIGIDA?ln=primefaces&amp;v=4.0" /><script type="text/javascript" src="/certidao/javax.faces.resource/jquery/jquery-plugins.js.htm;jsessionid=SESSAO_REDIGIDA?ln=primefaces&amp;v=4.0"></script><script type="text/javascript" src="/certidao/javax.faces.resource/primefaces.js.htm;jsessionid=SESSAO_REDIGIDA?ln=primefaces&amp;v=4.0"></script>
+	
+	<title>TRT 3ª Região - Emissão de Certidões</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+	<!--  Folhas de Estilo  -->
+	<link href="/certidao/recursos/css/bootstrap.min.css" rel="stylesheet" media="screen" />
+	<link href="/certidao/recursos/css/main.css" rel="stylesheet" media="screen" />
+
+	<!-- Javascript -->
+	<!--  &lt;script src="/certidao/recursos/js/jquery.js"/&gt; -->
+	<script src="/certidao/recursos/js/jquery.highlight-4.js"></script>
+	<script src="/certidao/recursos/js/bootstrap.min.js"></script>
+	<script src="/certidao/recursos/js/locale-primefaces.js"></script>
+	<script src="/certidao/recursos/js/acessibilidade.js"></script>
+	<script src="/certidao/recursos/js/main.js"></script>
+	
+	<!-- &lt;h:outputScript target="head"&gt;$ = jQuery;&lt;/h:outputScript&gt;
+		&lt;script type="text/javascript"&gt;jQuery.noConflict();&lt;/script&gt;     --></head><body>
+
+	<div id="menu-principal" class="navbar navbar-inverse navbar-fixed-top">
+		<div class="navbar-inner">
+			<div class="container-fluid">
+
+				<button type="button" class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+					<span class="icon-bar"></span> <span class="icon-bar"></span> <span class="icon-bar"></span>
+				</button><a id="nomeSistema" name="nomeSistema" href="/certidao/feitosTrabalhistas/consulta.htm;jsessionid=SESSAO_REDIGIDA" class="brand"><img id="figuraSistema" src="/certidao/recursos/img/logo_JT.png;jsessionid=SESSAO_REDIGIDA?pfdrid_c=true" alt="" style="margin-top: -5px;" />TRT 3ª Região / Sistema de Fornecimento de Certidão Eletrônica de Ações Trabalhistas - CEAT</a><div id="j_idt10" class="ui-tooltip ui-widget ui-widget-content ui-shadow ui-corner-all">TRT 3ª Região / Sistema de Fornecimento de Certidão Eletrônica de Ações Trabalhistas - CEAT</div><script id="j_idt10_s" type="text/javascript">$(function(){PrimeFaces.cw('Tooltip','widget_j_idt10',{id:'j_idt10',showEffect:'fade',hideEffect:'fade',target:'nomeSistema'});});</script>
+
+				
+
+				<div class="nav pull-right"><span id="ambiente" class="label label-inverse" style="margin-top: 10px;">v.1.25.0</span>
+				</div>
+
+			</div>
+		</div>
+	</div>
+
+	<noscript>
+		<div style="border: 1px solid red; padding: 10px">
+			<span style="color: red">JavaScript não está habilitado. Para o correto funcionamento
+				habilitar o JavaScript nas configurações do navegador e recarregar!</span>
+		</div>
+	</noscript>
+
+	<div class="container-fluid">
+		<div class="row-fluid">
+
+			<div><div id="messages" class="ui-messages ui-widget" aria-live="polite"></div>
+
+		<!-- In&iacute;cio da tabView para separa&ccedil;&atilde;o dos conte&uacute;dos --><div id="j_idt21" class="ui-tabmenu ui-widget ui-widget-content ui-corner-all"><ul class="ui-tabmenu-nav ui-helper-reset ui-helper-clearfix ui-widget-header ui-corner-all" role="tablist"><li class="ui-tabmenuitem ui-state-default ui-corner-top ui-tabmenuitem-hasicon" role="tab" aria-expanded="false"><a tabindex="-1" class="ui-menuitem-link ui-corner-all" href="/certidao/feitosTrabalhistas/aba0.informacoesGerais.htm;jsessionid=SESSAO_REDIGIDA"><span class="ui-menuitem-icon ui-icon ui-icon-home"></span><span class="ui-menuitem-text">Informações Gerais</span></a></li><li class="ui-tabmenuitem ui-state-default ui-state-active ui-corner-top ui-tabmenuitem-hasicon" role="tab" aria-expanded="true"><a tabindex="-1" class="ui-menuitem-link ui-corner-all" href="/certidao/feitosTrabalhistas/aba1.emissao.htm;jsessionid=SESSAO_REDIGIDA"><span class="ui-menuitem-icon ui-icon ui-icon-star"></span><span class="ui-menuitem-text">Emitir CEAT</span></a></li><li class="ui-tabmenuitem ui-state-default ui-corner-top ui-tabmenuitem-hasicon" role="tab" aria-expanded="false"><a tabindex="-1" class="ui-menuitem-link ui-corner-all" href="/certidao/feitosTrabalhistas/aba2.autenticacao.htm;jsessionid=SESSAO_REDIGIDA"><span class="ui-menuitem-icon ui-icon ui-icon-search"></span><span class="ui-menuitem-text">Autenticar CEAT</span></a></li><li class="ui-tabmenuitem ui-state-default ui-corner-top ui-tabmenuitem-hasicon" role="tab" aria-expanded="false"><a tabindex="-1" class="ui-menuitem-link ui-corner-all" href="/certidao/feitosTrabalhistas/aba3.duvidasFrequentes.htm;jsessionid=SESSAO_REDIGIDA"><span class="ui-menuitem-icon ui-icon ui-icon-help"></span><span class="ui-menuitem-text">Dúvidas Frequentes</span></a></li></ul></div><script id="j_idt21_s" type="text/javascript">PrimeFaces.cw('TabMenu','widget_j_idt21',{id:'j_idt21'});</script>
+<form id="form" name="form" method="post" action="/certidao/feitosTrabalhistas/aba1.emissao.htm;jsessionid=SESSAO_REDIGIDA" enctype="application/x-www-form-urlencoded">
+<input type="hidden" name="form" value="form" />
+<table>
+<tbody>
+<tr>
+<td><table id="form:tipoPessoa" class="ui-selectoneradio ui-widget"><tr><td><div class="ui-radiobutton ui-widget"><div class="ui-helper-hidden-accessible"><input id="form:tipoPessoa:0" name="form:tipoPessoa" type="radio" value="F" checked="checked" /></div><div class="ui-radiobutton-box ui-widget ui-corner-all ui-state-default ui-state-active"><span class="ui-radiobutton-icon ui-icon ui-icon-bullet"></span></div></div></td><td><label for="form:tipoPessoa:0">Pessoa Física</label></td><td><div class="ui-radiobutton ui-widget"><div class="ui-helper-hidden-accessible"><input id="form:tipoPessoa:1" name="form:tipoPessoa" type="radio" value="J" /></div><div class="ui-radiobutton-box ui-widget ui-corner-all ui-state-default"><span class="ui-radiobutton-icon"></span></div></div></td><td><label for="form:tipoPessoa:1">Pessoa Jurídica</label></td></tr></table><script id="form:tipoPessoa_s" type="text/javascript">$(function(){PrimeFaces.cw('SelectOneRadio','widget_form_tipoPessoa',{id:'form:tipoPessoa',behaviors:{change:function(event,ext){PrimeFaces.bc(this,event,ext,['PrimeFaces.ab({source:\'form:tipoPessoa\',event:\'change\',process:\'form:tipoPessoa\',update:\'form:tableDocumentos form:nomeConsulta form:painelNomeInformado form:textoVariacao\'}, arguments[1]);']);}}});});</script></td>
+</tr>
+</tbody>
+</table>
+<img id="form:j_idt29" width="1" height="10" alt="" src="/certidao/javax.faces.resource/spacer/dot_clear.gif.htm?ln=primefaces&amp;v=4.0" /><table id="form:tableDocumentos">
+<tbody>
+<tr>
+<td><span id="form:camposCPF"><table>
+<tbody>
+<tr>
+<td><label id="form:labelCPF" class="ui-outputlabel ui-widget">1. CPF: </label></td>
+<td><input id="form:inputCPF" name="form:inputCPF" type="text" class="ui-inputfield ui-inputmask ui-widget ui-state-default ui-corner-all largura15" /><script id="form:inputCPF_s" type="text/javascript">PrimeFaces.cw('InputMask','widget_form_inputCPF',{id:'form:inputCPF',mask:'999.999.999-99',behaviors:{change:function(event,ext){PrimeFaces.bc(this,event,ext,['PrimeFaces.ab({source:\'form:inputCPF\',event:\'change\',process:\'form:inputCPF\',update:\'form:imagemCaptcha form:verifyCaptcha_\'}, arguments[1]);']);}}});</script></td>
+<td><label id="form:labelCPFReceita" class="ui-outputlabel ui-widget">2. Nome Vinculado ao CPF perante a <br/> Secretaria da Receita Federal do Brasil: </label></td>
+<td><input id="form:nomeReceitaCPF" name="form:nomeReceitaCPF" type="text" value="Só será disponibilizado na Certidão" readonly="readonly" class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all largura30" /><script id="form:nomeReceitaCPF_s" type="text/javascript">PrimeFaces.cw('InputText','widget_form_nomeReceitaCPF',{id:'form:nomeReceitaCPF'});</script></td>
+</tr>
+</tbody>
+</table>
+</span></td>
+</tr>
+</tbody>
+</table>
+
+
+			<br /><span id="form:textoVariacao">Caso também queira pesquisar por uma variação do nome vinculado ao CPF perante a Secretaria da Receita Federal do Brasil, <a href="#" onclick="painelOpcional.show();" style="color: rgb(0, 136, 204)">
+					<i class="icon-share"></i>clique aqui.</a></span><div id="form:painelNomeInformado" class="ui-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden" data-widget="painelOpcional"><div id="form:painelNomeInformado_header" class="ui-panel-titlebar ui-widget-header ui-helper-clearfix ui-corner-all"><span class="ui-panel-title">Pesquisa opcional</span></div><div id="form:painelNomeInformado_content" class="ui-panel-content ui-widget-content"><table>
+<tbody>
+<tr>
+<td>3. Variação do nome vinculado ao CPF <br/> perante a Secretaria da Receita Federal do Brasil:</td>
+<td><input id="form:nomeConsulta" name="form:nomeConsulta" type="text" class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all largura30" /><script id="form:nomeConsulta_s" type="text/javascript">PrimeFaces.cw('InputText','widget_form_nomeConsulta',{id:'form:nomeConsulta',behaviors:{change:function(event,ext){PrimeFaces.bc(this,event,ext,['PrimeFaces.ab({source:\'form:nomeConsulta\',event:\'change\',process:\'form:nomeConsulta\',update:\'form:imagemCaptcha form:verifyCaptcha_\'}, arguments[1]);']);}}});</script></td>
+</tr>
+</tbody>
+</table>
+<span style="font-weight : bold;">Observações:</span><table>
+<tbody>
+<tr>
+<td>a) A pesquisa opcional não se destina à busca por ações trabalhistas nas quais figurem como reclamadas pessoas físicas que não estejam vinculadas ao CPF informado no campo 1.</td>
+</tr>
+<tr>
+<td>b) O resultado dessa pesquisa contemplará processos em que constem reclamados com o nome idêntico ao digitado no campo 3 e cujo CPF não esteja cadastrado no processo ou seja o mesmo informado no campo 1.</td>
+</tr>
+<tr>
+<td><a id="form:j_idt44" href="#" class="ui-commandlink ui-widget" onclick="PrimeFaces.ab({source:'form:j_idt44',process:'form:j_idt44',update:'form:painelNomeInformado'});return false;" style="color: rgb(0, 136, 204)">
+						<i class="icon-chevron-up"></i> voltar</a></td>
+</tr>
+</tbody>
+</table>
+</div></div><script id="form:painelNomeInformado_s" type="text/javascript">PrimeFaces.cw('Panel','painelOpcional',{id:'form:painelNomeInformado'});</script>
+
+			<br />
+			<br />Informe os caracteres da figura:<img id="form:imagemCaptcha" src="/certidao/seam/resource/captcha;jsessionid=SESSAO_REDIGIDA?f=1700000000000" /><input id="form:verifyCaptcha_" name="form:verifyCaptcha_" type="text" style="width:100px;" class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all" /><script id="form:verifyCaptcha__s" type="text/javascript">PrimeFaces.cw('InputText','widget_form_verifyCaptcha_',{id:'form:verifyCaptcha_'});</script>
+
+			<br />
+			<br /><button id="form:botaoConsultar" name="form:botaoConsultar" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only ui-priority-primary" onclick="PrimeFaces.monitorDownload(startDownload, stopDownload);" type="submit"><span class="ui-button-text ui-c">Consultar</span></button><script id="form:botaoConsultar_s" type="text/javascript">PrimeFaces.cw('CommandButton','widget_form_botaoConsultar',{id:'form:botaoConsultar'});</script><button id="form:j_idt50" name="form:j_idt50" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" type="submit"><span class="ui-button-text ui-c">Limpar</span></button><script id="form:j_idt50_s" type="text/javascript">PrimeFaces.cw('CommandButton','widget_form_j_idt50',{id:'form:j_idt50'});</script><input type="hidden" name="javax.faces.ViewState" id="javax.faces.ViewState" value="VIEWSTATE_REDIGIDO" autocomplete="off" />
+</form>
+			</div>
+
+
+		</div>
+	</div><div id="j_idt52"></div><script id="j_idt52_s" type="text/javascript">$(function(){PrimeFaces.cw('AjaxStatus','widget_j_idt52',{id:'j_idt52',start:function(){statusDialog.show();},success:function(){statusDialog.hide();}});});</script><div id="j_idt53" class="ui-dialog ui-widget ui-widget-content ui-overlay-hidden ui-corner-all ui-shadow"><div class="ui-dialog-titlebar ui-widget-header ui-helper-clearfix ui-corner-top"><span id="j_idt53_title" class="ui-dialog-title">Carregando...</span></div><div class="ui-dialog-content ui-widget-content"><img id="j_idt54" src="/certidao/recursos/img/ajaxloadingbar.gif;jsessionid=SESSAO_REDIGIDA?pfdrid_c=true" alt="" /></div></div><script id="j_idt53_s" type="text/javascript">$(function(){PrimeFaces.cw('Dialog','statusDialog',{id:'j_idt53',draggable:false,modal:true});});</script></body>
+</html>
