@@ -111,12 +111,14 @@ def _parse_resposta(cpf_fmt: str, status: int, corpo: dict) -> dict:
     mensagem = (violacoes[0].get("mensagem") if violacoes else "") or ""
 
     if _NAO_LOCALIZADO in mensagem.lower():
-        # CPF válido no cálculo que não existe na base — resposta, não erro
+        # CPF válido no cálculo que não existe na base — resposta, não erro.
+        # A frase do TCU é longa demais para caber numa linha na interface;
+        # encurtar é papel da fonte, que é dona do texto.
         return {
             "cpf": cpf_fmt,
             "encontrado": False,
             "cpf_inexistente": True,
-            "mensagem": mensagem,
+            "mensagem": "CPF não localizado na base do TCU.",
         }
 
     return {

@@ -408,9 +408,6 @@ _HTML = r"""<!DOCTYPE html>
       line-height: 1.5;
       color: var(--muted);
       margin-top: 14px;
-      /* Mensagem vem da fonte e pode ser longa: equilibra as linhas em vez de
-         deixar uma palavra sozinha na última. Navegador sem suporte ignora. */
-      text-wrap: balance;
     }
 
     .spin {

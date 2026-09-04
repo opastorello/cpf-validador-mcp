@@ -130,7 +130,7 @@ def test_cpf_nao_localizado_nao_e_erro():
     r = _parse_resposta(CPF_FMT, 412, NAO_LOCALIZADO)
     assert r["encontrado"] is False
     assert r["cpf_inexistente"] is True
-    assert "não localizado" in r["mensagem"]
+    assert r["mensagem"] == "CPF não localizado na base do TCU."   # curta: cabe numa linha
     assert "erro" not in r
 
 
