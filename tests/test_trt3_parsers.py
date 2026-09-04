@@ -131,3 +131,9 @@ def test_numero_da_certidao_pula_o_codigo_de_autenticidade():
 
 def test_texto_vazio_nao_quebra():
     assert _parse_texto_certidao("") == {"tem_feitos": False}
+
+
+def test_cpf_da_certidao_e_extraido():
+    """O texto real é '...no CPF sob o nº 111.444.777-35.' — havia palavras
+    entre 'CPF' e o número, e o padrão antigo exigia que fossem adjacentes."""
+    assert _parse_texto_certidao(NEGATIVA)["cpf_certidao"] == "111.444.777-35"
