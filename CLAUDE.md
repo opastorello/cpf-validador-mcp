@@ -129,13 +129,17 @@ Para adicionar uma fonte: copie `sources/exemplo.py`, implemente `consultar()` e
 uma linha em `_REGISTRO`. Nenhum router ou tool MCP precisa mudar.
 
 ### Logs da consulta
-`services/trt3.py` usa `logging.getLogger("trt3")`; o root logger é configurado em `main.py` via `LOG_LEVEL`.
+Dois loggers, configurados pelo root logger em `main.py` via `LOG_LEVEL`:
+- `consulta` (`sources/__init__.py`) — o que vale para qualquer fonte: início, progresso, fim de
+  lote e `MATCH`. Toda linha traz `fonte=<nome>`
+- `trt3` (`sources/trt3.py`) — o que é específico do scraping: CAPTCHA, PDF, sessão
+
 - `INFO` — certidão obtida (com tipo, tentativas, duração), `MATCH`, início/progresso/fim de lote
 - `DEBUG` — cada tentativa de CAPTCHA, o texto lido pela CRNN e o nome da certidão
 - `WARNING` — captcha esgotado numa tentativa, PDF ilegível, timeout, resposta não reconhecida
 - `ERROR` — página sem CAPTCHA (layout do TRT3 mudou) e desistência após todas as tentativas
 
-**CPF nunca sai inteiro no log** — `_log_cpf()` mascara para `111.***.***-35`. O nome da certidão
+**CPF nunca sai inteiro no log** — `sources/base.py::mascarar_cpf()` reduz para `111.***.***-35`. O nome da certidão
 só aparece em `DEBUG`. `tests/test_logging.py` trava as duas garantias.
 
 ### Fluxo de scraping TRT3
