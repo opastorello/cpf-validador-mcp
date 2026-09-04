@@ -40,6 +40,12 @@ CAPTCHA_TIMEOUT         = _float("CAPTCHA_TIMEOUT", 15.0)
 MAX_CAPTCHA_ATTEMPTS    = _int("MAX_CAPTCHA_ATTEMPTS", 20)
 RETRY_DELAY             = _float("RETRY_DELAY", 1.0)
 
+# ── TCU (certidoes.apps.tcu.gov.br) ─────────────────────────
+TCU_BASE_URL            = _str("TCU_BASE_URL", "https://certidoes.apps.tcu.gov.br")
+# Teto da busca do proof-of-work; na prática o contador fica abaixo de 5.000
+TCU_POW_MAX_COUNTER     = _int("TCU_POW_MAX_COUNTER", 200_000)
+TCU_MAX_ATTEMPTS        = _int("TCU_MAX_ATTEMPTS", 3)
+
 # ── Workers / concorrência ───────────────────────────────────
 DEFAULT_WORKERS         = _int("DEFAULT_WORKERS", 8)
 MAX_WORKERS             = _int("MAX_WORKERS", 20)

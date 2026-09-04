@@ -7,6 +7,9 @@ services:
       - API_TOKEN=${API_TOKEN:-}
       - ENV=${ENV:-production}
       - SOURCE=${SOURCE:-trt3}
+      - TCU_BASE_URL=${TCU_BASE_URL:-https://certidoes.apps.tcu.gov.br}
+      - TCU_POW_MAX_COUNTER=${TCU_POW_MAX_COUNTER:-200000}
+      - TCU_MAX_ATTEMPTS=${TCU_MAX_ATTEMPTS:-3}
       - TRT3_BASE_URL=${TRT3_BASE_URL:-https://certidao.trt3.jus.br}
       - TRT3_FORM_PATH=${TRT3_FORM_PATH:-/certidao/feitosTrabalhistas/aba1.emissao.htm}
       - HTTP_TIMEOUT=${HTTP_TIMEOUT:-30}

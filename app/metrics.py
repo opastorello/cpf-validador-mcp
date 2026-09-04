@@ -80,6 +80,31 @@ trt3_http_errors_total = Counter(
     ["type"],  # timeout | connection | http_status
 )
 
+# ── TCU (específico desta fonte) ───────────────────────────────────────────────
+
+tcu_pow_duration_seconds = Histogram(
+    "tcu_pow_duration_seconds",
+    "Tempo para resolver o proof-of-work do Altcha",
+    buckets=[0.25, 0.5, 1, 2, 4, 8, 15, 30],
+)
+
+tcu_pow_counter = Histogram(
+    "tcu_pow_counter",
+    "Contador encontrado no proof-of-work (proporcional ao trabalho gasto)",
+    buckets=[500, 1000, 2000, 3000, 5000, 10000, 50000],
+)
+
+tcu_concurrent_queries = Gauge(
+    "tcu_concurrent_queries",
+    "Consultas ao TCU em execução agora (inclui as aguardando semáforo)",
+)
+
+tcu_http_errors_total = Counter(
+    "tcu_http_errors_total",
+    "Erros ao se comunicar com o TCU, por tipo de exceção",
+    ["type"],
+)
+
 # ── CPF operações ──────────────────────────────────────────────────────────────
 
 cpf_validations_total = Counter(

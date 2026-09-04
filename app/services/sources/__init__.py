@@ -34,6 +34,11 @@ _REGISTRO: dict[str, tuple[str, str, str]] = {
         "TRT3",
         "TRT 3ª Região (certidao.trt3.jus.br)",
     ),
+    "tcu": (
+        "app.services.sources.tcu",
+        "TCU",
+        "TCU — Contas Julgadas Irregulares (certidoes.apps.tcu.gov.br)",
+    ),
     "exemplo": (
         "app.services.sources.exemplo",
         "Exemplo",
