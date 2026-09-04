@@ -102,6 +102,7 @@ Todas as opções são lidas de variáveis de ambiente ou do arquivo `.env` na r
 | -------- | ------ | --------- |
 | `API_TOKEN` | *(vazio — sem auth)* | Token Bearer. Se vazio, todos os endpoints ficam abertos |
 | `ENV` | `development` | `development` ou `production` — controla quais rotas ficam abertas sem token |
+| `SOURCE` | `trt3` | Fonte consultada: `trt3` (real) ou `exemplo` (fictícia, não consulta nada) |
 | `TRT3_BASE_URL` | `https://certidao.trt3.jus.br` | URL base do site do TRT3 |
 | `TRT3_FORM_PATH` | `/certidao/feitosTrabalhistas/aba1.emissao.htm` | Path do formulário de consulta |
 | `HTTP_TIMEOUT` | `30` | Timeout (segundos) para requisições HTTP ao TRT3 |

@@ -9,7 +9,7 @@ from starlette.concurrency import run_in_threadpool
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.services.cpf import is_valido, formatar, gerar_cpfs_de_mascara
-from app.services.trt3 import consultar_trt3, consultar_trt3_multiplos
+from app.services.sources import consultar, consultar_multiplos
 from app import config as _cfg
 from app import metrics as _m
 
@@ -96,7 +96,7 @@ async def feitos(request: Request, body: CpfRequest):
         raise HTTPException(status_code=422, detail="CPF deve ter 11 dígitos")
     if not is_valido(cpf_limpo):
         raise HTTPException(status_code=422, detail="CPF matematicamente inválido")
-    result = await run_in_threadpool(consultar_trt3, cpf_limpo)
+    result = await run_in_threadpool(consultar, cpf_limpo)
     if result.get("encontrado"):
         _m.trt3_feitos_total.labels(result="found").inc()
         _m.trt3_matches_total.labels(type="feitos").inc()
@@ -139,7 +139,7 @@ async def feitos_multiplos(request: Request, body: FeitosMultiplosRequest):
 
     _m.cpf_bulk_queries_total.inc()
     _m.cpf_bulk_size.observe(len(cpfs_validos))
-    resultado = await run_in_threadpool(consultar_trt3_multiplos, cpfs_validos, None, body.workers)
+    resultado = await run_in_threadpool(consultar_multiplos, cpfs_validos, None, body.workers)
     resultado["erros"] = erros
     matches = len(resultado.get("matches", {}))
     if matches:
@@ -174,7 +174,7 @@ async def buscar_por_mascara(request: Request, body: BuscarMascaraRequest):
     _m.cpf_mask_searches_total.inc()
     _m.cpf_mask_candidates_total.inc(len(candidates))
     resultado = await run_in_threadpool(
-        consultar_trt3_multiplos, candidates, body.nome, body.workers
+        consultar_multiplos, candidates, body.nome, body.workers
     )
     resultado["candidatos_gerados"] = len(candidates)
     matches = len(resultado.get("matches", {}))
@@ -213,7 +213,7 @@ async def buscar_por_mascara_stream(request: Request, body: BuscarMascaraRequest
 
     def run():
         try:
-            result = consultar_trt3_multiplos(candidates, body.nome, body.workers, progress_cb=on_progress, match_cb=on_match)
+            result = consultar_multiplos(candidates, body.nome, body.workers, progress_cb=on_progress, match_cb=on_match)
             result["candidatos_gerados"] = total
             loop.call_soon_threadsafe(q.put_nowait, {"done": True, "result": result})
         except Exception as e:
@@ -283,7 +283,7 @@ async def buscar_por_variacoes(request: Request, body: BuscarVariacoesRequest):
         raise HTTPException(status_code=422, detail="Nenhum candidato válido gerado")
     _m.cpf_variation_searches_total.inc()
     _m.cpf_variation_candidates_total.inc(len(candidates))
-    resultado = await run_in_threadpool(consultar_trt3_multiplos, candidates, body.nome, body.workers)
+    resultado = await run_in_threadpool(consultar_multiplos, candidates, body.nome, body.workers)
     resultado["candidatos_gerados"] = len(candidates)
     matches = len(resultado.get("matches", {}))
     if matches:
@@ -314,7 +314,7 @@ async def buscar_por_variacoes_stream(request: Request, body: BuscarVariacoesReq
 
     def run():
         try:
-            result = consultar_trt3_multiplos(candidates, body.nome, body.workers, progress_cb=on_progress, match_cb=on_match)
+            result = consultar_multiplos(candidates, body.nome, body.workers, progress_cb=on_progress, match_cb=on_match)
             result["candidatos_gerados"] = total
             loop.call_soon_threadsafe(q.put_nowait, {"done": True, "result": result})
         except Exception as e:

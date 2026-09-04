@@ -1,10 +1,11 @@
 """
-Logs da consulta ao TRT3 — o que aparece e, principalmente, o que não pode aparecer.
+Logs da consulta — o que aparece e, principalmente, o que não pode aparecer.
 """
 import logging
 from unittest.mock import patch
 
-from app.services.trt3 import _log_cpf, consultar_trt3_multiplos
+from app.services.sources import consultar_multiplos
+from app.services.sources.base import Fonte, mascarar_cpf
 
 FAKE = {
     "cpf": "111.444.777-35",
@@ -14,14 +15,23 @@ FAKE = {
 }
 
 
-def test_log_cpf_mascara_o_meio():
-    assert _log_cpf("111.444.777-35") == "111.***.***-35"
+class FonteFake(Fonte):
+    nome = "fake"
+    rotulo = "Fonte de teste"
+
+    def consultar(self, cpf_limpo: str) -> dict:
+        return FAKE
+
+
+def test_mascarar_cpf_esconde_o_meio():
+    assert mascarar_cpf("111.444.777-35") == "111.***.***-35"
+    assert mascarar_cpf("11144477735") == "111.***.***-35"
 
 
 def _rodar_lote(caplog, level):
-    with caplog.at_level(level, logger="trt3"):
-        with patch("app.services.trt3._consultar_trt3_interno", return_value=FAKE):
-            consultar_trt3_multiplos(["11144477735"])
+    with caplog.at_level(level, logger="consulta"):
+        with patch("app.services.sources.get_fonte", return_value=FonteFake()):
+            consultar_multiplos(["11144477735"])
     return "\n".join(r.getMessage() for r in caplog.records)
 
 
@@ -41,5 +51,6 @@ def test_nome_aparece_apenas_em_debug(caplog):
 def test_lote_loga_inicio_progresso_e_fim(caplog):
     texto = _rodar_lote(caplog, logging.INFO)
     assert "lote iniciado" in texto
+    assert "fonte=fake" in texto          # a fonte usada aparece no log
     assert "lote 1/1 (100%)" in texto
     assert "lote concluído" in texto

@@ -2,7 +2,7 @@ from fastmcp import FastMCP
 import re
 from starlette.concurrency import run_in_threadpool
 from app.services.cpf import validate_cpf as _validate_cpf, generate_valid_variations as _generate_valid_variations, gerar_cpfs_de_mascara, is_valido, formatar
-from app.services.trt3 import consultar_trt3, consultar_trt3_multiplos
+from app.services.sources import consultar as consultar_fonte, consultar_multiplos
 from app import metrics as _m
 
 mcp = FastMCP("cpf-validador")
@@ -41,7 +41,7 @@ async def check_feitos_trabalhistas(cpf: str) -> dict:
     if not is_valido(cpf_limpo):
         _m.trt3_mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="invalid").inc()
         return {"erro": "CPF matematicamente inválido", "cpf": formatar(cpf_limpo)}
-    result = await run_in_threadpool(consultar_trt3, cpf_limpo)
+    result = await run_in_threadpool(consultar_fonte, cpf_limpo)
     if result.get("encontrado"):
         _m.trt3_mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="found").inc()
         _m.trt3_matches_total.labels(type="mcp_feitos").inc()
@@ -79,7 +79,7 @@ async def find_cpf_by_mask(mascara: str, nome: str | None = None, workers: int =
 
     _m.cpf_mask_searches_total.inc()
     _m.cpf_mask_candidates_total.inc(len(candidates))
-    resultado = await run_in_threadpool(consultar_trt3_multiplos, candidates, nome, workers)
+    resultado = await run_in_threadpool(consultar_multiplos, candidates, nome, workers)
     resultado["candidatos_gerados"] = len(candidates)
     matches = len(resultado.get("matches", {}))
     _m.trt3_mcp_calls_total.labels(tool="find_cpf_by_mask", result="success" if matches else "not_found").inc()
@@ -134,7 +134,7 @@ async def find_cpf_by_variations(cpf_parcial: str, nome: str | None = None, work
     _m.cpf_variation_searches_total.inc()
     _m.cpf_variation_candidates_total.inc(len(candidates))
     resultado = await run_in_threadpool(
-        consultar_trt3_multiplos, list(candidates), nome, workers
+        consultar_multiplos, list(candidates), nome, workers
     )
     resultado["candidatos_gerados"] = len(candidates)
     matches = len(resultado.get("matches", {}))
@@ -175,7 +175,7 @@ async def check_multiple_cpfs(cpfs: list[str], workers: int = 8) -> dict:
 
     _m.cpf_bulk_queries_total.inc()
     _m.cpf_bulk_size.observe(len(cpfs_validos))
-    resultado = await run_in_threadpool(consultar_trt3_multiplos, cpfs_validos, None, workers)
+    resultado = await run_in_threadpool(consultar_multiplos, cpfs_validos, None, workers)
     resultado["erros"] = erros
     matches = len(resultado.get("matches", {}))
     _m.trt3_mcp_calls_total.labels(tool="check_multiple_cpfs", result="success" if matches else "not_found").inc()

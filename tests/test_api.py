@@ -93,7 +93,7 @@ def test_trt3_feitos_cpf_curto(client):
 
 
 def test_trt3_feitos_sucesso(client):
-    with patch("app.routers.trt3.consultar_trt3", return_value=MOCK_FEITOS):
+    with patch("app.routers.trt3.consultar", return_value=MOCK_FEITOS):
         r = client.post("/trt3/feitos", json={"cpf": "111.444.777-35"})
     assert r.status_code == 200
     assert r.json()["cpf"] == "11144477735"
@@ -181,7 +181,7 @@ def test_buscar_por_mascara_aceita_formato_alternativo(client):
         capturado["candidatos"] = candidatos
         return {"total": len(candidatos), "matches": {}, "resultados": {}}
 
-    with patch("app.routers.trt3.consultar_trt3_multiplos", side_effect=_fake):
+    with patch("app.routers.trt3.consultar_multiplos", side_effect=_fake):
         r = client.post("/trt3/buscar-por-mascara", json={"mascara": "___.444.777-__"})
 
     assert r.status_code == 200

@@ -28,6 +28,10 @@ IS_PRODUCTION           = ENV == "production"
 # ── Auth ────────────────────────────────────────────────────
 API_TOKEN               = _str("API_TOKEN", "")
 
+# ── Fonte de consulta ────────────────────────────────────────
+# Fonte usada para descobrir a titularidade do CPF. Ver app/services/sources/
+SOURCE                  = _str("SOURCE", "trt3").lower()
+
 # ── TRT3 scraping ───────────────────────────────────────────
 TRT3_BASE_URL           = _str("TRT3_BASE_URL", "https://certidao.trt3.jus.br")
 TRT3_FORM_PATH          = _str("TRT3_FORM_PATH", "/certidao/feitosTrabalhistas/aba1.emissao.htm")

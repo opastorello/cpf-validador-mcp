@@ -6,6 +6,8 @@ import threading
 from pypdf import PdfReader
 from curl_cffi import requests as _requests
 from app.captcha.predictor import predict as _solve_captcha
+from app.services.cpf import formatar
+from app.services.sources.base import Fonte, mascarar_cpf
 from app import config as _cfg
 from app import metrics as _m
 
@@ -24,15 +26,6 @@ _HEADERS = {
     "Accept-Encoding": "gzip, deflate, br",
     "Connection": "keep-alive",
 }
-
-
-def _formatar(cpf: str) -> str:
-    return f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
-
-
-def _log_cpf(cpf_fmt: str) -> str:
-    """CPF sai parcialmente mascarado nos logs (LGPD): 111.***.***-35."""
-    return f"{cpf_fmt[:3]}.***.***-{cpf_fmt[-2:]}"
 
 
 def _fetch_page(session) -> tuple[str, str, str]:
@@ -134,7 +127,7 @@ def _parse_html_resultado(cpf_limpo, cpf_fmt, resp) -> dict:
 
 
 def _consultar_trt3_interno(cpf_limpo: str) -> dict:
-    cpf_fmt = _formatar(cpf_limpo)
+    cpf_fmt = formatar(cpf_limpo)
     _m.trt3_concurrent_queries.inc()
     try:
         with _TRT3_SEMAPHORE:
@@ -146,7 +139,7 @@ def _consultar_trt3_interno(cpf_limpo: str) -> dict:
 def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
     session = _requests.Session(impersonate="chrome124")
     attempts = 0
-    cpf_log = _log_cpf(cpf_fmt)
+    cpf_log = mascarar_cpf(cpf_fmt)
 
     t_query_start = time.time()
     log.debug("consulta iniciada cpf=%s", cpf_log)
@@ -267,57 +260,15 @@ def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
     return {"cpf": cpf_fmt, "encontrado": None, "erro": f"CAPTCHA não resolvido após {_cfg.MAX_CAPTCHA_ATTEMPTS} tentativas."}
 
 
-def consultar_trt3(cpf_limpo: str) -> dict:
-    return _consultar_trt3_interno(cpf_limpo)
+class TRT3(Fonte):
+    """Certidão de feitos trabalhistas do TRT da 3ª Região (Minas Gerais).
 
+    Resolve o CAPTCHA com a CRNN local e extrai nome, tipo de certidão e
+    validade do PDF devolvido.
+    """
 
-def consultar_trt3_multiplos(cpfs: list[str], nome_filtro: str | None = None, workers: int | None = None, progress_cb=None, match_cb=None) -> dict:
-    from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeout
+    nome = "trt3"
+    rotulo = "TRT 3ª Região (certidao.trt3.jus.br)"
 
-    n_workers = max(1, min(workers if workers is not None else _cfg.DEFAULT_WORKERS, _cfg.MAX_WORKERS))
-    filtro = nome_filtro.lower() if nome_filtro else None
-
-    resultados = {}
-    matches = {}
-    completed = 0
-    t0 = time.time()
-    # em lotes grandes, loga progresso a cada ~10% para a busca não ficar muda
-    passo = max(1, len(cpfs) // 10)
-
-    log.info("lote iniciado: %d cpf(s), %d workers%s",
-             len(cpfs), n_workers, f", filtrando nome={nome_filtro!r}" if filtro else "")
-    with ThreadPoolExecutor(max_workers=n_workers) as executor:
-        futures = {executor.submit(_consultar_trt3_interno, cpf): cpf for cpf in cpfs}
-        for future in as_completed(futures):
-            cpf = futures[future]
-            try:
-                result = future.result(timeout=_cfg.TASK_TIMEOUT)
-                resultados[cpf] = result
-                is_match = (
-                    filtro in (result.get("nome_certidao") or "").lower()
-                    if filtro else result.get("encontrado") is True
-                )
-                if is_match:
-                    matches[cpf] = result
-                    log.info("MATCH cpf=%s", _log_cpf(_formatar(cpf)))
-                    # o nome da certidão é PII: só aparece em DEBUG, nunca no log padrão
-                    if result.get("nome_certidao"):
-                        log.debug("MATCH cpf=%s nome=%r", _log_cpf(_formatar(cpf)), result["nome_certidao"])
-                    if match_cb:
-                        match_cb(result)
-            except FutureTimeout:
-                log.warning("timeout de %.0fs cpf=%s", _cfg.TASK_TIMEOUT, _log_cpf(_formatar(cpf)))
-                resultados[cpf] = {"cpf": _formatar(cpf), "encontrado": None, "erro": f"Timeout após {_cfg.TASK_TIMEOUT}s"}
-            except Exception as e:
-                log.warning("falha cpf=%s: %s: %s", _log_cpf(_formatar(cpf)), type(e).__name__, e)
-                resultados[cpf] = {"cpf": _formatar(cpf), "encontrado": None, "erro": str(e)}
-            completed += 1
-            if completed % passo == 0 or completed == len(cpfs):
-                log.info("lote %d/%d (%d%%) — %d match(es) até agora",
-                         completed, len(cpfs), completed * 100 // len(cpfs), len(matches))
-            if progress_cb:
-                progress_cb(completed, len(cpfs))
-
-    log.info("lote concluído: %d cpf(s), %d match(es) em %.1fs",
-             len(cpfs), len(matches), time.time() - t0)
-    return {"total": len(cpfs), "matches": matches, "resultados": resultados}
+    def consultar(self, cpf_limpo: str) -> dict:
+        return _consultar_trt3_interno(cpf_limpo)
