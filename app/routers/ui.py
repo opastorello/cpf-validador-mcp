@@ -788,7 +788,7 @@ _HTML = r"""<!DOCTYPE html>
           variations = vrData.variations || [];
           totalCandidatos = variations.length;
           if (!totalCandidatos) throw new Error('Nenhuma variação válida encontrada para este CPF');
-          doneStep(s2, `${totalCandidatos} variação${totalCandidatos!==1?'ões':'ão'} válida${totalCandidatos!==1?'s':''}`);
+          doneStep(s2, `${totalCandidatos} variaç${totalCandidatos!==1?'ões':'ão'} válida${totalCandidatos!==1?'s':''}`);
         } else {
           doneStep(s2, hasMask ? 'Calculando…' : '1 CPF');
         }

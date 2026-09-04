@@ -120,3 +120,9 @@ def test_html_mostra_a_fonte_ativa(monkeypatch):
     html = asyncio.run(ui_mod.ui())
     assert "Fonte de exemplo" in html
     assert "__FONTE_ROTULO__" not in html
+
+
+def test_plural_de_variacoes_esta_correto():
+    """Concatenar 'variação' + 'ões' dava "variaçãoões" na tela."""
+    assert "variaçãoões" not in _HTML
+    assert "variaç${totalCandidatos!==1?'ões':'ão'}" in _HTML
