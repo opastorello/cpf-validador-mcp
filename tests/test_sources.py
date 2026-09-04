@@ -196,3 +196,16 @@ def test_sem_nome_nao_interrompe():
     r = consultar_multiplos([CPF_COM_REGISTRO, CPF_SEM_REGISTRO], fonte="exemplo")
     assert r["interrompido"] is False
     assert r["consultados"] == 2
+
+
+def test_fonte_sem_dependencia_da_erro_acionavel(monkeypatch):
+    """A imagem pode ser montada sem as deps de uma fonte (COM_TRT3=false).
+    O erro tem de dizer o que instalar, não só "No module named 'torch'"."""
+    import app.services.sources as mod
+
+    monkeypatch.setitem(mod._instancias, "trt3", None)
+    del mod._instancias["trt3"]
+    monkeypatch.setattr(mod.importlib, "import_module",
+                        lambda *_: (_ for _ in ()).throw(ImportError("No module named 'torch'")))
+    with pytest.raises(RuntimeError, match="requirements-trt3.txt"):
+        mod.get_fonte("trt3")

@@ -5,8 +5,8 @@ Guia para o Claude Code ao trabalhar neste repositório.
 ## Comandos
 
 ```bash
-# Instalar dependências
-pip install -r requirements.txt
+# Instalar dependências (requirements-trt3.txt inclui o PyTorch da CRNN)
+pip install -r requirements-trt3.txt
 
 # Rodar localmente (FastAPI + FastMCP na porta 8000)
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

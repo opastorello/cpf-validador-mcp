@@ -2,14 +2,25 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Layer separado para torch — só invalida se mudar a versão aqui, nunca por causa do requirements.txt
-RUN pip install --no-cache-dir \
-    "torch>=2.0.0" "torchvision>=0.15.0" \
-    --index-url https://download.pytorch.org/whl/cpu
+# A fonte TRT3 precisa de PyTorch (~780 MB) para a CRNN que lê o CAPTCHA dela.
+# Nenhuma outra fonte precisa — o CAPTCHA do TCU é proof-of-work, resolvido só
+# com a biblioteca padrão. Para uma imagem sem PyTorch:
+#   docker build --build-arg COM_TRT3=false .
+ARG COM_TRT3=true
 
-COPY requirements.txt .
+# Layer separado para torch — só invalida se mudar a versão aqui, nunca por causa do requirements.txt
+RUN if [ "$COM_TRT3" = "true" ]; then \
+      pip install --no-cache-dir "torch>=2.0.0" "torchvision>=0.15.0" \
+        --index-url https://download.pytorch.org/whl/cpu; \
+    fi
+
+COPY requirements.txt requirements-trt3.txt ./
 # torch/torchvision já instalados acima — pip verifica versão e pula, sem re-download
-RUN pip install --no-cache-dir -r requirements.txt
+RUN if [ "$COM_TRT3" = "true" ]; then \
+      pip install --no-cache-dir -r requirements-trt3.txt; \
+    else \
+      pip install --no-cache-dir -r requirements.txt; \
+    fi
 
 COPY app/ ./app/
 

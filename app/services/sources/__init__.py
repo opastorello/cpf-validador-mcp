@@ -68,7 +68,17 @@ def get_fonte(nome: str | None = None) -> Fonte:
         )
     if escolhida not in _instancias:
         modulo, classe, _ = _REGISTRO[escolhida]
-        _instancias[escolhida] = getattr(importlib.import_module(modulo), classe)()
+        try:
+            _instancias[escolhida] = getattr(importlib.import_module(modulo), classe)()
+        except ImportError as exc:
+            # A imagem pode ter sido montada sem as dependências de uma fonte
+            # (ex.: COM_TRT3=false tira o PyTorch). Sem esta mensagem, o erro
+            # sai como "No module named 'torch'", que não diz o que fazer.
+            raise RuntimeError(
+                f"A fonte {escolhida!r} precisa de dependências que não estão instaladas "
+                f"({exc}). Instale com `pip install -r requirements-{escolhida}.txt` ou "
+                f"reconstrua a imagem sem desligar essa fonte."
+            ) from exc
         log.info("fonte ativa: %s — %s", escolhida, _instancias[escolhida].rotulo)
     return _instancias[escolhida]
 

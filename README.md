@@ -121,6 +121,19 @@ A fonte também declara o que sabe fazer, e a interface se adapta: uma fonte com
 `usa_captcha = False` mostra "Consulta concluída" no lugar de "CAPTCHA resolvido", em vez
 de anunciar um trabalho que não aconteceu.
 
+#### Imagem sem PyTorch
+
+O PyTorch existe só para a CRNN que lê o CAPTCHA de imagem do TRT3 — são ~780 MB, 44% da
+imagem. O CAPTCHA do TCU é proof-of-work, resolvido com a biblioteca padrão. Se você não
+vai usar `SOURCE=trt3`:
+
+```bash
+docker build --build-arg COM_TRT3=false .   # 473 MB em vez de 1.76 GB
+```
+
+Subir essa imagem com `SOURCE=trt3` falha no boot com a instrução de como instalar, em vez
+de subir e quebrar na primeira consulta.
+
 #### Escrevendo uma fonte nova
 
 Copie `app/services/sources/exemplo.py` — ele tem os cinco passos de uma consulta

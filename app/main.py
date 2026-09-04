@@ -27,7 +27,10 @@ if _cfg.SOURCE not in _fontes:
     raise RuntimeError(
         f"SOURCE={_cfg.SOURCE!r} não existe. Disponíveis: {', '.join(sorted(_fontes))}"
     )
-logging.getLogger("consulta").info("fonte configurada: %s — %s", _cfg.SOURCE, _fontes[_cfg.SOURCE])
+# Carrega a fonte ativa agora, não na primeira consulta: se as dependências
+# dela não estiverem na imagem (COM_TRT3=false com SOURCE=trt3), é melhor não
+# subir do que subir "healthy" e falhar quando alguém consultar.
+sources.get_fonte()
 
 # FastMCP — endpoint will live at /mcp (no sub-mount, avoids 307 redirect)
 _mcp_app = mcp.http_app(path="/mcp")

@@ -1,0 +1,6 @@
+# Dependências da fonte TRT3: o CAPTCHA dela é imagem, resolvida pela CRNN.
+# São ~780 MB — 44% da imagem — e nenhuma outra fonte precisa delas.
+# Instale só se SOURCE=trt3 for usado.
+-r requirements.txt
+torch>=2.0.0
+torchvision>=0.15.0
