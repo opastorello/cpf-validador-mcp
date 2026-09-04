@@ -13,6 +13,15 @@ from abc import ABC, abstractmethod
 from app.services.cpf import formatar
 
 
+# Mensagens exibidas ao usuário quando não há resultado. Ficam aqui, e não
+# dentro de cada fonte, para que todas digam a mesma coisa nos mesmos casos: o
+# usuário não deve descobrir qual fonte respondeu pelo texto da mensagem. Uma
+# fonte só escreve texto próprio quando tem algo que nenhuma outra teria.
+MSG_CPF_INEXISTENTE = "CPF não localizado na base consultada."
+MSG_SEM_REGISTRO = "Nenhum registro encontrado."
+MSG_INDETERMINADO = "Resposta não reconhecida pela fonte."
+
+
 def mascarar_cpf(cpf: str) -> str:
     """CPF parcialmente mascarado para uso em log (LGPD): 111.***.***-35.
 
@@ -59,8 +68,9 @@ class Fonte(ABC):
                                          diferente de existir e não ter registro.
                                          Acompanha ``encontrado=False``.
         ``mensagem``    str              Texto exibido ao usuário quando não há
-                                         resultado. É da fonte: a interface o mostra
-                                         como veio, sem reescrever.
+                                         resultado. Use as constantes ``MSG_*``
+                                         deste módulo para os casos comuns; a
+                                         interface mostra como veio, sem reescrever.
         ==============  ===============  ==================================================
 
         Qualquer chave extra (``tipo_certidao``, ``valida_ate``, ``pdf_url``…)

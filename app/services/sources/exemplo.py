@@ -12,7 +12,7 @@ marcados abaixo. Depois registre a classe em ``sources/__init__.py``.
 import logging
 
 from app.services.cpf import formatar
-from app.services.sources.base import Fonte, mascarar_cpf
+from app.services.sources.base import MSG_SEM_REGISTRO, Fonte, mascarar_cpf
 
 log = logging.getLogger("exemplo")
 
@@ -60,7 +60,7 @@ class Exemplo(Fonte):
                 "encontrado": False,
                 "fonte": self.nome,
                 "aviso": "dados fictícios — fonte de exemplo",
-                "mensagem": "Nenhum registro encontrado.",
+                "mensagem": MSG_SEM_REGISTRO,
             }
 
         # ─── passo 4: traduzir a resposta externa para o contrato ──────────

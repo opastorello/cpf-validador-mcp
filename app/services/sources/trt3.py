@@ -7,7 +7,13 @@ from pypdf import PdfReader
 from curl_cffi import requests as _requests
 from app.captcha.predictor import predict as _solve_captcha
 from app.services.cpf import formatar
-from app.services.sources.base import Fonte, mascarar_cpf
+from app.services.sources.base import (
+    MSG_CPF_INEXISTENTE,
+    MSG_INDETERMINADO,
+    MSG_SEM_REGISTRO,
+    Fonte,
+    mascarar_cpf,
+)
 from app import config as _cfg
 from app import metrics as _m
 
@@ -134,9 +140,9 @@ def _parse_html_resultado(cpf_limpo, cpf_fmt, resp) -> dict:
     ]
     for pattern in nao_encontrado_patterns:
         if re.search(pattern, html, re.IGNORECASE):
-            return {"cpf": cpf_fmt, "encontrado": False, "mensagem": "Nenhum feito trabalhista encontrado."}
+            return {"cpf": cpf_fmt, "encontrado": False, "mensagem": MSG_SEM_REGISTRO}
 
-    return {"cpf": cpf_fmt, "encontrado": None, "mensagem": "Resultado indeterminado."}
+    return {"cpf": cpf_fmt, "encontrado": None, "mensagem": MSG_INDETERMINADO}
 
 
 def _consultar_trt3_interno(cpf_limpo: str) -> dict:
@@ -224,7 +230,7 @@ def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
                     "cpf": cpf_fmt,
                     "encontrado": False,
                     "cpf_inexistente": True,
-                    "mensagem": "CPF não encontrado na Receita Federal.",
+                    "mensagem": MSG_CPF_INEXISTENTE,
                 }
 
             # CAPTCHA errado: TRT3 devolve o formulário — próxima iteração busca página fresca

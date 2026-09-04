@@ -129,6 +129,11 @@ texto específico de uma fonte dentro da interface.
 A fonte declara também `usa_captcha` (padrão `False`), que a UI recebe via
 `__USA_CAPTCHA__` para escolher os rótulos dos passos.
 
+As frases exibidas ao usuário são padronizadas em `base.py` — `MSG_CPF_INEXISTENTE`,
+`MSG_SEM_REGISTRO` e `MSG_INDETERMINADO`. Toda fonte usa as mesmas: o usuário não deve
+descobrir qual respondeu pelo texto da mensagem. Texto próprio só quando a fonte tem algo
+que nenhuma outra teria.
+
 O registro é **preguiçoso**: a classe só é importada quando a fonte é usada, para que uma
 fonte sem CAPTCHA não carregue o PyTorch do TRT3. `tests/test_sources.py` trava isso.
 

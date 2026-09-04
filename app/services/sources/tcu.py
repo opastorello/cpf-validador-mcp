@@ -27,7 +27,7 @@ from curl_cffi import requests as _requests
 from app import config as _cfg
 from app import metrics as _m
 from app.services.cpf import formatar
-from app.services.sources.base import Fonte, mascarar_cpf
+from app.services.sources.base import MSG_CPF_INEXISTENTE, Fonte, mascarar_cpf
 
 log = logging.getLogger("tcu")
 
@@ -112,13 +112,13 @@ def _parse_resposta(cpf_fmt: str, status: int, corpo: dict) -> dict:
 
     if _NAO_LOCALIZADO in mensagem.lower():
         # CPF válido no cálculo que não existe na base — resposta, não erro.
-        # A frase do TCU é longa demais para caber numa linha na interface;
-        # encurtar é papel da fonte, que é dona do texto.
+        # A frase do TCU ("...na base da Receita Federal disponível no TCU") é
+        # longa e específica demais: o usuário vê a mensagem padrão.
         return {
             "cpf": cpf_fmt,
             "encontrado": False,
             "cpf_inexistente": True,
-            "mensagem": "CPF não localizado na base do TCU.",
+            "mensagem": MSG_CPF_INEXISTENTE,
         }
 
     return {

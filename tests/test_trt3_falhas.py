@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.services.sources import trt3 as m
+from app.services.sources.base import MSG_CPF_INEXISTENTE
 
 
 @pytest.fixture(autouse=True)
@@ -118,7 +119,7 @@ def test_cpf_nao_cadastrado_nao_vira_retry_de_captcha(caplog):
 
     assert r["encontrado"] is False
     assert r["cpf_inexistente"] is True
-    assert "Receita Federal" in r["mensagem"]
+    assert r["mensagem"] == MSG_CPF_INEXISTENTE   # frase padrão, não texto do TRT3
     assert "erro" not in r
     assert solve.call_count == 1, "resolveu CAPTCHA mais de uma vez"
     assert "não cadastrado na Receita Federal" in "\n".join(x.getMessage() for x in caplog.records)

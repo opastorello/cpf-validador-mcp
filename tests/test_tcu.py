@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.services.sources import tcu as m
+from app.services.sources.base import MSG_CPF_INEXISTENTE
 from app.services.sources.tcu import (
     TCU,
     _montar_captcha,
@@ -130,7 +131,7 @@ def test_cpf_nao_localizado_nao_e_erro():
     r = _parse_resposta(CPF_FMT, 412, NAO_LOCALIZADO)
     assert r["encontrado"] is False
     assert r["cpf_inexistente"] is True
-    assert r["mensagem"] == "CPF não localizado na base do TCU."   # curta: cabe numa linha
+    assert r["mensagem"] == MSG_CPF_INEXISTENTE   # frase padrão, igual em toda fonte
     assert "erro" not in r
 
 

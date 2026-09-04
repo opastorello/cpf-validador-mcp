@@ -132,3 +132,17 @@ def test_capacidade_de_captcha_tem_padrao_no_contrato():
             return {"cpf": cpf_limpo, "encontrado": False}
 
     assert FonteMinima().usa_captcha is False
+
+
+def test_todas_as_fontes_usam_as_mesmas_frases():
+    """O usuário não deve descobrir qual fonte respondeu pelo texto da mensagem."""
+    from app.services.sources.base import MSG_CPF_INEXISTENTE, MSG_SEM_REGISTRO
+
+    sem_registro = get_fonte("exemplo").consultar(CPF_SEM_REGISTRO)
+    assert sem_registro["mensagem"] == MSG_SEM_REGISTRO
+
+    # as duas fontes reais dizem a mesma coisa para "CPF não existe"
+    from app.services.sources.tcu import _parse_resposta as parse_tcu
+    tcu = parse_tcu("151.879.820-95", 412, {"violacoes": [
+        {"mensagem": "CPF não localizado na base da Receita Federal disponível no TCU"}]})
+    assert tcu["mensagem"] == MSG_CPF_INEXISTENTE

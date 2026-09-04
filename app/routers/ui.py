@@ -931,7 +931,7 @@ _HTML = r"""<!DOCTYPE html>
             // Caso distinto de "não tem processos": a fonte não reconhece o CPF.
             // O texto vem da fonte — "Receita Federal" é vocabulário do TRT3 e
             // não valeria para outra fonte.
-            const msg = msgInexistente || 'CPF válido no cálculo, mas não consta na fonte consultada.';
+            const msg = msgInexistente || 'CPF não localizado na base consultada.';
             $out.innerHTML = `<div class="err-box">⚠️ ${esc(msg)}</div>`;
             return;
           }
