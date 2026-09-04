@@ -18,6 +18,7 @@ uma linha em `_REGISTRO`.
 import importlib
 import logging
 import time
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout, as_completed
 
 from app import config as _cfg
@@ -72,6 +73,29 @@ def get_fonte(nome: str | None = None) -> Fonte:
     return _instancias[escolhida]
 
 
+def _normalizar_nome(nome: str) -> str:
+    """Maiúsculas, sem acento e sem espaço sobrando, para comparar nomes."""
+    sem_acento = unicodedata.normalize("NFD", (nome or "").upper())
+    return " ".join(sem_acento.encode("ascii", "ignore").decode().split())
+
+
+def nome_confirmado(encontrado: str | None, procurado: str | None) -> bool:
+    """O nome encontrado confirma quem se procurava?
+
+    Confirma quando os nomes são iguais ou quando toda palavra procurada
+    aparece inteira no nome encontrado — "MARIA SILVA" confirma
+    "MARIA APARECIDA SILVA", mas "SILVA" sozinho não, porque casaria com
+    qualquer homônimo parcial. Mesma regra do selo "✓ Confirmado" da interface.
+    """
+    a, b = _normalizar_nome(encontrado), _normalizar_nome(procurado)
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    palavras = set(a.split())
+    return len(b.split()) > 1 and all(p in palavras for p in b.split())
+
+
 def _rotulo(resultado: dict) -> str:
     """Traduz o resultado da fonte para o label da métrica."""
     if resultado.get("erro"):
@@ -114,6 +138,7 @@ def consultar_multiplos(
     progress_cb=None,
     match_cb=None,
     fonte: str | None = None,
+    parar_ao_confirmar: bool = True,
 ) -> dict:
     """Consulta vários CPFs em paralelo na fonte ativa.
 
@@ -128,6 +153,7 @@ def consultar_multiplos(
     resultados = {}
     matches = {}
     completed = 0
+    interrompido = False
     t0 = time.time()
     # em lotes grandes, loga progresso a cada ~10% para a busca não ficar muda
     passo = max(1, len(cpfs) // 10)
@@ -137,6 +163,8 @@ def consultar_multiplos(
     with ThreadPoolExecutor(max_workers=n_workers) as executor:
         futures = {executor.submit(_consultar_medindo, ativa, cpf): cpf for cpf in cpfs}
         for future in as_completed(futures):
+            if interrompido:
+                break
             cpf = futures[future]
             try:
                 result = future.result(timeout=_cfg.TASK_TIMEOUT)
@@ -153,6 +181,15 @@ def consultar_multiplos(
                         log.debug("MATCH cpf=%s nome=%r", mascarar_cpf(cpf), result["nome_certidao"])
                     if match_cb:
                         match_cb(result)
+                    # Achou quem se procurava: varrer o resto só gasta consulta
+                    # no serviço externo e tempo do usuário.
+                    if parar_ao_confirmar and nome_confirmado(
+                        result.get("nome_certidao"), nome_filtro
+                    ):
+                        interrompido = True
+                        canceladas = sum(1 for f in futures if f.cancel())
+                        log.info("nome confirmado em %d/%d — %d consultas canceladas",
+                                 completed + 1, len(cpfs), canceladas)
             except FutureTimeout:
                 log.warning("timeout de %.0fs cpf=%s", _cfg.TASK_TIMEOUT, mascarar_cpf(cpf))
                 resultados[cpf] = {"cpf": formatar(cpf), "encontrado": None, "erro": f"Timeout após {_cfg.TASK_TIMEOUT}s"}
@@ -166,6 +203,13 @@ def consultar_multiplos(
             if progress_cb:
                 progress_cb(completed, len(cpfs))
 
-    log.info("lote concluído: fonte=%s, %d cpf(s), %d match(es) em %.1fs",
-             ativa.nome, len(cpfs), len(matches), time.time() - t0)
-    return {"total": len(cpfs), "matches": matches, "resultados": resultados}
+    log.info("lote concluído: fonte=%s, %d de %d cpf(s), %d match(es) em %.1fs%s",
+             ativa.nome, completed, len(cpfs), len(matches), time.time() - t0,
+             " (interrompido)" if interrompido else "")
+    return {
+        "total": len(cpfs),
+        "consultados": completed,
+        "interrompido": interrompido,
+        "matches": matches,
+        "resultados": resultados,
+    }

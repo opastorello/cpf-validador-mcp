@@ -62,6 +62,7 @@ class BuscarVariacoesRequest(BaseModel):
     cpf_parcial: str = Field(..., description="CPF com 9 a 11 dígitos, podendo ter erros ou estar incompleto", examples=["1518798209", "151879820"])
     nome: str | None = Field(None, description="Fragmento do nome para filtrar os resultados (opcional, case-insensitive)", examples=["joao", "Maria Silva"])
     workers: int = Field(default=_cfg.DEFAULT_WORKERS, ge=1, le=_cfg.MAX_WORKERS, description=f"Threads paralelas para consulta ao TRT3 (1–{_cfg.MAX_WORKERS})")
+    parar_ao_confirmar: bool = Field(default=True, description="Interrompe a busca assim que um resultado confirmar o `nome` informado, em vez de varrer todos os candidatos. Sem `nome`, não tem efeito")
 
 
 class FeitosMultiplosRequest(BaseModel):
@@ -75,6 +76,7 @@ class BuscarMascaraRequest(BaseModel):
     mascara: str = Field(..., description=f"CPF com curingas nos dígitos desconhecidos. Aceita `*`, `X`, `x`, `?`, `_` e `#` (equivalentes) e qualquer separador — `.`, `-`, `/` ou espaço — inclusive nenhum. Os dígitos verificadores podem ser omitidos. Máximo de {_cfg.MAX_WILDCARDS_IN_MASK} curingas na parte base (posições 0–8)", examples=["15X.879.82X-95", "***.879.820-**", "151.879.___-95", "151.879.820"])
     nome: str | None = Field(None, description="Fragmento do nome para filtrar os resultados (opcional, case-insensitive)", examples=["joao", "Maria Silva"])
     workers: int = Field(default=_cfg.DEFAULT_WORKERS, ge=1, le=_cfg.MAX_WORKERS, description=f"Threads paralelas para consulta ao TRT3 (1–{_cfg.MAX_WORKERS})")
+    parar_ao_confirmar: bool = Field(default=True, description="Interrompe a busca assim que um resultado confirmar o `nome` informado, em vez de varrer todos os candidatos. Sem `nome`, não tem efeito")
 
 
 # Sem prefixo aqui: main.py monta em /consulta. Os caminhos não citam a fonte,
@@ -185,7 +187,8 @@ async def buscar_por_mascara(request: Request, body: BuscarMascaraRequest):
     _m.cpf_mask_searches_total.inc()
     _m.cpf_mask_candidates_total.inc(len(candidates))
     resultado = await run_in_threadpool(
-        consultar_multiplos, candidates, body.nome, body.workers
+        consultar_multiplos, candidates, body.nome, body.workers,
+        parar_ao_confirmar=body.parar_ao_confirmar
     )
     resultado["candidatos_gerados"] = len(candidates)
     matches = len(resultado.get("matches", {}))
@@ -224,7 +227,9 @@ async def buscar_por_mascara_stream(request: Request, body: BuscarMascaraRequest
 
     def run():
         try:
-            result = consultar_multiplos(candidates, body.nome, body.workers, progress_cb=on_progress, match_cb=on_match)
+            result = consultar_multiplos(candidates, body.nome, body.workers,
+                                        progress_cb=on_progress, match_cb=on_match,
+                                        parar_ao_confirmar=body.parar_ao_confirmar)
             result["candidatos_gerados"] = total
             loop.call_soon_threadsafe(q.put_nowait, {"done": True, "result": result})
         except Exception as e:
@@ -294,7 +299,8 @@ async def buscar_por_variacoes(request: Request, body: BuscarVariacoesRequest):
         raise HTTPException(status_code=422, detail="Nenhum candidato válido gerado")
     _m.cpf_variation_searches_total.inc()
     _m.cpf_variation_candidates_total.inc(len(candidates))
-    resultado = await run_in_threadpool(consultar_multiplos, candidates, body.nome, body.workers)
+    resultado = await run_in_threadpool(consultar_multiplos, candidates, body.nome, body.workers,
+        parar_ao_confirmar=body.parar_ao_confirmar)
     resultado["candidatos_gerados"] = len(candidates)
     matches = len(resultado.get("matches", {}))
     if matches:
@@ -325,7 +331,9 @@ async def buscar_por_variacoes_stream(request: Request, body: BuscarVariacoesReq
 
     def run():
         try:
-            result = consultar_multiplos(candidates, body.nome, body.workers, progress_cb=on_progress, match_cb=on_match)
+            result = consultar_multiplos(candidates, body.nome, body.workers,
+                                        progress_cb=on_progress, match_cb=on_match,
+                                        parar_ao_confirmar=body.parar_ao_confirmar)
             result["candidatos_gerados"] = total
             loop.call_soon_threadsafe(q.put_nowait, {"done": True, "result": result})
         except Exception as e:

@@ -696,6 +696,8 @@ _HTML = r"""<!DOCTYPE html>
       let inexistente = false;   // CPF válido no cálculo que a fonte não reconhece
       let msgInexistente = '';   // o texto vem da fonte: cada uma tem o seu
       let inexistentes = 0;      // quantos assim numa busca em lote
+      let consultados = 0;       // quantos candidatos chegaram a ser consultados
+      let interrompido = false;  // parou cedo por ter confirmado o nome
 
       // Candidatos que o TRT3 respondeu "não existe na Receita Federal": numa
       // busca por máscara costumam ser a maioria, e dizer isso explica por que
@@ -852,8 +854,10 @@ _HTML = r"""<!DOCTYPE html>
               }
             }
             if (!vfinal) throw new Error('Stream de variações encerrado sem resultado');
-            doneStep(s4, txtResolvidos(totalCandidatos));
+            doneStep(s4, txtResolvidos(vfinal.consultados ?? totalCandidatos));
             inexistentes = contaInexistentes(vfinal);
+            consultados  = vfinal.consultados ?? totalCandidatos;
+            interrompido = !!vfinal.interrompido;
             resultados = liveMatches;
           }
         } else if (hasMask) {
@@ -911,8 +915,10 @@ _HTML = r"""<!DOCTYPE html>
           if (!finalData) throw new Error('Stream encerrado sem resultado');
           totalCandidatos = finalData.candidatos_gerados || '?';
           s2.querySelector('span:last-child').textContent = `${totalCandidatos} combinaç${totalCandidatos!=1?'ões':'ão'} calculada${totalCandidatos!=1?'s':''}`;
-          doneStep(s4, txtResolvidos(totalCandidatos));
+          doneStep(s4, txtResolvidos(finalData.consultados ?? totalCandidatos));
           inexistentes = contaInexistentes(finalData);
+          consultados  = finalData.consultados ?? totalCandidatos;
+          interrompido = !!finalData.interrompido;
           resultados = liveMatches;
         } else {
           const res  = await post('/consulta/feitos', {cpf});
@@ -964,8 +970,10 @@ _HTML = r"""<!DOCTYPE html>
           if (d.nome_certidao) saveToHistory(d.cpf || cpf, d.nome_certidao, d.numero_certidao || null, duracaoS || null);
         });
 
-        const metaStr = (hasMask || useVariations) && resultados.length > 1
-          ? `${resultados.length} resultado${resultados.length!==1?'s':''} · ${totalCandidatos} candidatos${inexistentes ? ` · ${inexistentes} inexistentes` : ''} · ${$el.textContent}`
+        // Mostra o resumo também com um único resultado quando a busca parou
+        // cedo: é justamente aí que interessa dizer quantos foram testados.
+        const metaStr = (hasMask || useVariations) && (resultados.length > 1 || interrompido)
+          ? `${resultados.length} resultado${resultados.length!==1?'s':''} · ${interrompido ? `${consultados} de ${totalCandidatos} testados — nome confirmado` : `${totalCandidatos} candidatos`}${inexistentes ? ` · ${inexistentes} inexistentes` : ''} · ${$el.textContent}`
           : resultados.length > 1 ? `${resultados.length} resultados` : '';
 
         const mkCard = d => {

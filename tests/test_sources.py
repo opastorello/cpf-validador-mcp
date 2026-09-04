@@ -3,6 +3,7 @@ Camada de fontes: registro, seleção via SOURCE e o contrato que toda fonte cum
 """
 import subprocess
 import sys
+from unittest.mock import patch
 
 import pytest
 
@@ -146,3 +147,52 @@ def test_todas_as_fontes_usam_as_mesmas_frases():
     tcu = parse_tcu("151.879.820-95", 412, {"violacoes": [
         {"mensagem": "CPF não localizado na base da Receita Federal disponível no TCU"}]})
     assert tcu["mensagem"] == MSG_CPF_INEXISTENTE
+
+
+# ── parada antecipada ──────────────────────────────────────────────────────
+
+def test_nome_confirmado():
+    from app.services.sources import nome_confirmado as nc
+    assert nc("MARION FRANCISCO VELNECKER", "marion francisco velnecker")
+    assert nc("MARIA APARECIDA SILVA", "MARIA SILVA")      # todas as palavras batem
+    assert nc("ANTONIO JOSE", "ANTÔNIO JOSÉ")              # acento não conta
+    assert not nc("JOAO PEDRO SOUSA", "SOUSA")             # uma palavra só não confirma
+    assert not nc("JOSE DA SILVA", "JOAO DA SILVA")
+    assert not nc("QUALQUER UM", None)
+
+
+def test_para_ao_confirmar_o_nome():
+    """Achou quem se procurava: varrer o resto só gasta consulta e tempo."""
+    nome_alvo = get_fonte("exemplo").consultar(CPF_COM_REGISTRO)["nome_certidao"]
+    consultados = []
+
+    class FonteContada(Fonte):
+        nome, rotulo = "contada", "Fonte de teste"
+
+        def consultar(self, cpf_limpo: str) -> dict:
+            consultados.append(cpf_limpo)
+            return get_fonte("exemplo").consultar(cpf_limpo)
+
+    cpfs = [CPF_SEM_REGISTRO] * 50 + [CPF_COM_REGISTRO] + [CPF_SEM_REGISTRO] * 50
+    with patch("app.services.sources.get_fonte", return_value=FonteContada()):
+        r = consultar_multiplos(cpfs, nome_filtro=nome_alvo, workers=1)
+
+    assert r["interrompido"] is True
+    assert r["consultados"] < r["total"]
+    assert len(r["matches"]) == 1
+
+
+def test_parar_ao_confirmar_desligado_varre_tudo():
+    nome_alvo = get_fonte("exemplo").consultar(CPF_COM_REGISTRO)["nome_certidao"]
+    cpfs = [CPF_COM_REGISTRO, CPF_SEM_REGISTRO]
+    r = consultar_multiplos(cpfs, nome_filtro=nome_alvo, fonte="exemplo",
+                            parar_ao_confirmar=False)
+    assert r["interrompido"] is False
+    assert r["consultados"] == r["total"] == 2
+
+
+def test_sem_nome_nao_interrompe():
+    """Sem filtro de nome não há o que confirmar: varre tudo."""
+    r = consultar_multiplos([CPF_COM_REGISTRO, CPF_SEM_REGISTRO], fonte="exemplo")
+    assert r["interrompido"] is False
+    assert r["consultados"] == 2

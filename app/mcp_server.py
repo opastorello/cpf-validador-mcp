@@ -54,7 +54,8 @@ async def check_feitos_trabalhistas(cpf: str) -> dict:
 
 
 @mcp.tool
-async def find_cpf_by_mask(mascara: str, nome: str | None = None, workers: int = 8) -> dict:
+async def find_cpf_by_mask(mascara: str, nome: str | None = None, workers: int = 8,
+                           parar_ao_confirmar: bool = True) -> dict:
     """Descobre o CPF completo a partir de uma máscara com curingas nos dígitos desconhecidos.
     Gera todas as combinações matematicamente válidas e consulta o TRT3 em paralelo.
     Se 'nome' for informado, filtra somente os resultados que contenham o nome na certidão.
@@ -66,6 +67,8 @@ async def find_cpf_by_mask(mascara: str, nome: str | None = None, workers: int =
             Ex: '15X.879.82X-95', '***.879.820-**', '151.879.820'
         nome: nome ou parte do nome para filtrar (ex: 'Italvino Rebelatto')
         workers: número de threads paralelas (padrão 8)
+        parar_ao_confirmar: interrompe assim que um resultado confirmar o 'nome'
+            informado, em vez de varrer todos os candidatos. Sem 'nome' não tem efeito
     """
     workers = max(1, min(workers, 20))
     try:
@@ -80,7 +83,8 @@ async def find_cpf_by_mask(mascara: str, nome: str | None = None, workers: int =
 
     _m.cpf_mask_searches_total.inc()
     _m.cpf_mask_candidates_total.inc(len(candidates))
-    resultado = await run_in_threadpool(consultar_multiplos, candidates, nome, workers)
+    resultado = await run_in_threadpool(consultar_multiplos, candidates, nome, workers,
+                                        parar_ao_confirmar=parar_ao_confirmar)
     resultado["candidatos_gerados"] = len(candidates)
     matches = len(resultado.get("matches", {}))
     _m.mcp_calls_total.labels(tool="find_cpf_by_mask", result="success" if matches else "not_found").inc()
@@ -90,7 +94,8 @@ async def find_cpf_by_mask(mascara: str, nome: str | None = None, workers: int =
 
 
 @mcp.tool
-async def find_cpf_by_variations(cpf_parcial: str, nome: str | None = None, workers: int = 8) -> dict:
+async def find_cpf_by_variations(cpf_parcial: str, nome: str | None = None, workers: int = 8,
+                                 parar_ao_confirmar: bool = True) -> dict:
     """Dado um CPF parcial ou com erros, encontra o CPF correto filtrando pelo nome.
     Gera todas as variações matematicamente válidas e consulta o TRT3 em paralelo.
     Ideal para recuperar um CPF com um dígito faltando ou digitado errado.
@@ -99,6 +104,8 @@ async def find_cpf_by_variations(cpf_parcial: str, nome: str | None = None, work
         cpf_parcial: CPF com dígitos faltando ou errados (9 a 11 dígitos)
         nome: nome ou parte do nome para filtrar (ex: 'nicolas', 'pastorello')
         workers: número de threads paralelas (padrão 8)
+        parar_ao_confirmar: interrompe assim que um resultado confirmar o 'nome'
+            informado, em vez de varrer todos os candidatos. Sem 'nome' não tem efeito
     """
     workers = max(1, min(workers, 20))
     from app.services.cpf import generate_valid_variations
@@ -135,7 +142,8 @@ async def find_cpf_by_variations(cpf_parcial: str, nome: str | None = None, work
     _m.cpf_variation_searches_total.inc()
     _m.cpf_variation_candidates_total.inc(len(candidates))
     resultado = await run_in_threadpool(
-        consultar_multiplos, list(candidates), nome, workers
+        consultar_multiplos, list(candidates), nome, workers,
+        parar_ao_confirmar=parar_ao_confirmar,
     )
     resultado["candidatos_gerados"] = len(candidates)
     matches = len(resultado.get("matches", {}))
@@ -154,6 +162,8 @@ async def check_multiple_cpfs(cpfs: list[str], workers: int = 8) -> dict:
     Args:
         cpfs: lista de CPFs (aceita com ou sem formatação)
         workers: número de threads paralelas (padrão 8)
+        parar_ao_confirmar: interrompe assim que um resultado confirmar o 'nome'
+            informado, em vez de varrer todos os candidatos. Sem 'nome' não tem efeito
     """
     workers = max(1, min(workers, 20))
     cpfs_validos = []
