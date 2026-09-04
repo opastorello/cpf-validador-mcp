@@ -233,6 +233,22 @@ def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
                     "mensagem": MSG_CPF_INEXISTENTE,
                 }
 
+            # "Falha na Transação": erro do lado do TRT3 — sessão inválida,
+            # throttling ou indisponibilidade. Também devolve o formulário, então
+            # sem esta checagem vira retry de CAPTCHA e queima as 20 tentativas
+            # reportando um erro que não é o que aconteceu.
+            if re.search(r"Falha na Transa[çc][ãa]o", resp.text, re.IGNORECASE):
+                _m.trt3_captcha_result_total.labels(result="success").inc()
+                _m.trt3_captcha_retries_per_query.observe(attempts)
+                log.warning("TRT3 recusou a transação cpf=%s (tentativa %d/%d)",
+                            cpf_log, attempt + 1, _cfg.MAX_CAPTCHA_ATTEMPTS)
+                return {
+                    "cpf": cpf_fmt,
+                    "encontrado": None,
+                    "erro": "O TRT3 recusou a consulta (Falha na Transação). "
+                            "Costuma ser instabilidade ou limite do tribunal — tente mais tarde.",
+                }
+
             # CAPTCHA errado: TRT3 devolve o formulário — próxima iteração busca página fresca
             captcha_invalido = re.search(
                 r"captcha inv[aá]lido|c[oó]digo incorreto|tente novamente|caracteres da imagem|caracteres da figura",

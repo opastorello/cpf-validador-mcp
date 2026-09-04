@@ -130,3 +130,20 @@ def test_a_fixture_tem_o_campo_de_captcha():
     justamente a presença dele que fazia a resposta ser lida como captcha
     errado."""
     assert "form:verifyCaptcha_" in NAO_CADASTRADO
+
+
+def test_falha_na_transacao_nao_vira_retry_de_captcha(caplog):
+    """Erro do TRT3 chega com o formulário de volta, igual a captcha recusado.
+    Sem distinguir, gasta as 20 tentativas e reporta erro de CAPTCHA."""
+    resp = _resposta(text='<span class="erro">Falha na Transação</span>'
+                          '<input name="form:verifyCaptcha_" />')
+    with caplog.at_level(logging.WARNING, logger="trt3"):
+        with patch.object(m, "_fetch_page", return_value=("http://x", "vs", "http://c")), \
+             patch.object(m, "_solve_captcha", return_value="abc123") as solve, \
+             patch.object(m, "_post_form", return_value=resp):
+            r = m._consultar_trt3_com_sessao("15187982095", "151.879.820-95")
+
+    assert r["encontrado"] is None
+    assert "Falha na Transação" in r["erro"]
+    assert solve.call_count == 1, "gastou mais de um CAPTCHA num erro do tribunal"
+    assert "recusou a transação" in "\n".join(x.getMessage() for x in caplog.records)
