@@ -102,6 +102,16 @@ app/
 - Máscaras de 9 ou 10 posições completam os dígitos verificadores com curinga
 - Caractere desconhecido → `ValueError` apontando o caractere (nunca descarte silencioso)
 
+### Logs da consulta
+`services/trt3.py` usa `logging.getLogger("trt3")`; o root logger é configurado em `main.py` via `LOG_LEVEL`.
+- `INFO` — certidão obtida (com tipo, tentativas, duração), `MATCH`, início/progresso/fim de lote
+- `DEBUG` — cada tentativa de CAPTCHA, o texto lido pela CRNN e o nome da certidão
+- `WARNING` — captcha esgotado numa tentativa, PDF ilegível, timeout, resposta não reconhecida
+- `ERROR` — página sem CAPTCHA (layout do TRT3 mudou) e desistência após todas as tentativas
+
+**CPF nunca sai inteiro no log** — `_log_cpf()` mascara para `111.***.***-35`. O nome da certidão
+só aparece em `DEBUG`. `tests/test_logging.py` trava as duas garantias.
+
 ### Fluxo de scraping TRT3
 1. GET página do formulário → extrai JSF `ViewState` e URL do CAPTCHA
 2. Download da imagem CAPTCHA → resolve com **modelo CRNN local** (PyTorch, ~99% acurácia)

@@ -22,6 +22,7 @@ services:
       - RATE_LIMIT_VARIACOES=${RATE_LIMIT_VARIACOES:-3/minute}
       - CAPTCHA_MODEL_PATH=${CAPTCHA_MODEL_PATH:-}
       - METRICS_PUBLIC=${METRICS_PUBLIC:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s

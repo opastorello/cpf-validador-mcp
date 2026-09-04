@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -8,6 +10,13 @@ from app import metrics as _m
 from app.routers import cpf, trt3, ui
 from app.mcp_server import mcp
 from app.auth import TokenMiddleware
+from app import config as _cfg
+
+logging.basicConfig(
+    level=getattr(logging, _cfg.LOG_LEVEL, logging.INFO),
+    format="%(asctime)s %(levelname)-7s %(name)s | %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 limiter = Limiter(key_func=get_remote_address)
 

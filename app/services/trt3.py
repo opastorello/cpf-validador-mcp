@@ -1,12 +1,15 @@
 import re
 import io
 import time
+import logging
 import threading
 from pypdf import PdfReader
 from curl_cffi import requests as _requests
 from app.captcha.predictor import predict as _solve_captcha
 from app import config as _cfg
 from app import metrics as _m
+
+log = logging.getLogger("trt3")
 
 _TRT3_BASE = _cfg.TRT3_BASE_URL
 _TRT3_URL = f"{_TRT3_BASE}{_cfg.TRT3_FORM_PATH}"
@@ -25,6 +28,11 @@ _HEADERS = {
 
 def _formatar(cpf: str) -> str:
     return f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
+
+
+def _log_cpf(cpf_fmt: str) -> str:
+    """CPF sai parcialmente mascarado nos logs (LGPD): 111.***.***-35."""
+    return f"{cpf_fmt[:3]}.***.***-{cpf_fmt[-2:]}"
 
 
 def _fetch_page(session) -> tuple[str, str, str]:
@@ -138,8 +146,10 @@ def _consultar_trt3_interno(cpf_limpo: str) -> dict:
 def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
     session = _requests.Session(impersonate="chrome124")
     attempts = 0
+    cpf_log = _log_cpf(cpf_fmt)
 
     t_query_start = time.time()
+    log.debug("consulta iniciada cpf=%s", cpf_log)
 
     for attempt in range(_cfg.MAX_CAPTCHA_ATTEMPTS):
         try:
@@ -149,6 +159,7 @@ def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
                 _m.trt3_queries_total.labels(result="error").inc()
                 _m.trt3_captcha_retries_per_query.observe(attempts)
                 _m.trt3_query_duration_seconds.observe(time.time() - t_query_start)
+                log.error("página do TRT3 sem URL de CAPTCHA (layout mudou?) cpf=%s", cpf_log)
                 return {"cpf": cpf_fmt, "encontrado": None, "erro": "CAPTCHA URL não encontrada."}
 
             _m.trt3_captcha_attempts_total.inc()
@@ -163,7 +174,10 @@ def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
                 _m.trt3_http_errors_total.labels(type=err_type).inc()
                 raise
             captcha_text = _solve_captcha(captcha_resp.content).strip()
-            _m.trt3_captcha_duration_seconds.observe(time.time() - t_captcha)
+            dt_captcha = time.time() - t_captcha
+            _m.trt3_captcha_duration_seconds.observe(dt_captcha)
+            log.debug("tentativa %d/%d cpf=%s: CRNN leu %r em %.2fs",
+                      attempt + 1, _cfg.MAX_CAPTCHA_ATTEMPTS, cpf_log, captcha_text, dt_captcha)
 
             try:
                 resp = _post_form(session, action_url, viewstate, cpf_fmt, captcha_text)
@@ -179,12 +193,17 @@ def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
                 try:
                     dados = _extrair_dados_pdf(resp.content)
                     _m.trt3_pdf_parsed_total.labels(result="success").inc()
-                except Exception:
+                except Exception as exc:
                     _m.trt3_pdf_parsed_total.labels(result="error").inc()
+                    log.warning("PDF recebido mas ilegível cpf=%s: %s: %s",
+                                cpf_log, type(exc).__name__, exc)
                     dados = {}
                 _m.trt3_captcha_retries_per_query.observe(attempts)
                 _m.trt3_queries_total.labels(result="found").inc()
-                _m.trt3_query_duration_seconds.observe(time.time() - t_query_start)
+                dt = time.time() - t_query_start
+                _m.trt3_query_duration_seconds.observe(dt)
+                log.info("certidão obtida cpf=%s tipo=%s tentativas=%d em %.1fs",
+                         cpf_log, dados.get("tipo_certidao", "?"), attempts, dt)
                 return {"cpf": cpf_fmt, "encontrado": True, **dados}
 
             # CAPTCHA errado: TRT3 devolve o formulário — próxima iteração busca página fresca
@@ -195,6 +214,8 @@ def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
             if captcha_invalido:
                 _m.trt3_captcha_result_total.labels(result="wrong").inc()
                 _m.trt3_session_resets_total.labels(reason="wrong_captcha").inc()
+                log.debug("captcha %r rejeitado (tentativa %d/%d) cpf=%s — nova sessão",
+                          captcha_text, attempt + 1, _cfg.MAX_CAPTCHA_ATTEMPTS, cpf_log)
                 session = _requests.Session(impersonate="chrome124")
                 time.sleep(_cfg.RETRY_DELAY)
                 continue
@@ -209,26 +230,40 @@ def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
                     pdf_data = _extrair_dados_pdf(pdf_resp.content)
                     result.update(pdf_data)
                     _m.trt3_pdf_parsed_total.labels(result="success").inc()
-                except Exception:
+                except Exception as exc:
                     _m.trt3_pdf_parsed_total.labels(result="error").inc()
+                    log.warning("falha ao baixar/ler o PDF da certidão cpf=%s: %s: %s",
+                                cpf_log, type(exc).__name__, exc)
 
             _m.trt3_captcha_retries_per_query.observe(attempts)
             found = result.get("encontrado")
             label = "found" if found is True else "not_found" if found is False else "indeterminate"
             _m.trt3_queries_total.labels(result=label).inc()
-            _m.trt3_query_duration_seconds.observe(time.time() - t_query_start)
+            dt = time.time() - t_query_start
+            _m.trt3_query_duration_seconds.observe(dt)
+            if found is True:
+                log.info("certidão obtida cpf=%s tentativas=%d em %.1fs", cpf_log, attempts, dt)
+            elif found is False:
+                log.debug("sem feitos cpf=%s tentativas=%d em %.1fs", cpf_log, attempts, dt)
+            else:
+                log.warning("resposta do TRT3 não reconhecida cpf=%s em %.1fs", cpf_log, dt)
             return result
 
-        except Exception:
+        except Exception as exc:
             _m.trt3_captcha_result_total.labels(result="error").inc()
             _m.trt3_session_resets_total.labels(reason="exception").inc()
+            log.warning("tentativa %d/%d falhou cpf=%s: %s: %s",
+                        attempt + 1, _cfg.MAX_CAPTCHA_ATTEMPTS, cpf_log, type(exc).__name__, exc)
             session = _requests.Session(impersonate="chrome124")
             time.sleep(_cfg.RETRY_DELAY)
             continue
 
     _m.trt3_captcha_retries_per_query.observe(attempts)
     _m.trt3_queries_total.labels(result="error").inc()
-    _m.trt3_query_duration_seconds.observe(time.time() - t_query_start)
+    dt = time.time() - t_query_start
+    _m.trt3_query_duration_seconds.observe(dt)
+    log.error("desisti de cpf=%s após %d tentativas de CAPTCHA (%.1fs)",
+              cpf_log, _cfg.MAX_CAPTCHA_ATTEMPTS, dt)
     return {"cpf": cpf_fmt, "encontrado": None, "erro": f"CAPTCHA não resolvido após {_cfg.MAX_CAPTCHA_ATTEMPTS} tentativas."}
 
 
@@ -245,6 +280,12 @@ def consultar_trt3_multiplos(cpfs: list[str], nome_filtro: str | None = None, wo
     resultados = {}
     matches = {}
     completed = 0
+    t0 = time.time()
+    # em lotes grandes, loga progresso a cada ~10% para a busca não ficar muda
+    passo = max(1, len(cpfs) // 10)
+
+    log.info("lote iniciado: %d cpf(s), %d workers%s",
+             len(cpfs), n_workers, f", filtrando nome={nome_filtro!r}" if filtro else "")
     with ThreadPoolExecutor(max_workers=n_workers) as executor:
         futures = {executor.submit(_consultar_trt3_interno, cpf): cpf for cpf in cpfs}
         for future in as_completed(futures):
@@ -258,14 +299,25 @@ def consultar_trt3_multiplos(cpfs: list[str], nome_filtro: str | None = None, wo
                 )
                 if is_match:
                     matches[cpf] = result
+                    log.info("MATCH cpf=%s", _log_cpf(_formatar(cpf)))
+                    # o nome da certidão é PII: só aparece em DEBUG, nunca no log padrão
+                    if result.get("nome_certidao"):
+                        log.debug("MATCH cpf=%s nome=%r", _log_cpf(_formatar(cpf)), result["nome_certidao"])
                     if match_cb:
                         match_cb(result)
             except FutureTimeout:
+                log.warning("timeout de %.0fs cpf=%s", _cfg.TASK_TIMEOUT, _log_cpf(_formatar(cpf)))
                 resultados[cpf] = {"cpf": _formatar(cpf), "encontrado": None, "erro": f"Timeout após {_cfg.TASK_TIMEOUT}s"}
             except Exception as e:
+                log.warning("falha cpf=%s: %s: %s", _log_cpf(_formatar(cpf)), type(e).__name__, e)
                 resultados[cpf] = {"cpf": _formatar(cpf), "encontrado": None, "erro": str(e)}
             completed += 1
+            if completed % passo == 0 or completed == len(cpfs):
+                log.info("lote %d/%d (%d%%) — %d match(es) até agora",
+                         completed, len(cpfs), completed * 100 // len(cpfs), len(matches))
             if progress_cb:
                 progress_cb(completed, len(cpfs))
 
+    log.info("lote concluído: %d cpf(s), %d match(es) em %.1fs",
+             len(cpfs), len(matches), time.time() - t0)
     return {"total": len(cpfs), "matches": matches, "resultados": resultados}

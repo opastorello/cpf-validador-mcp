@@ -51,6 +51,8 @@ RATE_LIMIT_MASK         = _str("RATE_LIMIT_MASK", "3/minute")
 RATE_LIMIT_VARIACOES    = _str("RATE_LIMIT_VARIACOES", "3/minute")
 
 # ── Observabilidade ──────────────────────────────────────────
+# DEBUG mostra cada tentativa de CAPTCHA; INFO mostra só o resultado da consulta
+LOG_LEVEL               = _str("LOG_LEVEL", "INFO").upper()
 # /metrics é público em development; em production exige token salvo se true
 METRICS_PUBLIC          = _bool("METRICS_PUBLIC", False)
 
