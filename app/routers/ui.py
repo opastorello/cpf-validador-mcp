@@ -1134,8 +1134,8 @@ _HTML = r"""<!DOCTYPE html>
       const data = histLoad();
       const entries = Object.values(data);
       if (!entries.length) return;
-      const hdr = ['Nome','CPF','Nº Certidão','Consultas','Última consulta','Duração (s)'];
-      const rows = entries.map(h => [h.nome||'',h.cpf||'',h.numero_certidao||'',h.consultas||'',h.ultima_consulta||'',h.ultima_duracao_s||'']);
+      const hdr = ['Nome','CPF','Fonte','Nº Certidão','Consultas','Última consulta','Duração (s)'];
+      const rows = entries.map(h => [h.nome||'',h.cpf||'',h.fonte_rotulo||h.fonte||'',h.numero_certidao||'',h.consultas||'',h.ultima_consulta||'',h.ultima_duracao_s||'']);
       const csv = [hdr,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
       const a = Object.assign(document.createElement('a'),{
         href: URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})),
