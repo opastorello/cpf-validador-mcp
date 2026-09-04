@@ -62,10 +62,27 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Extrair notas do CHANGELOG
+        id: notas
+        if: steps.check.outputs.new == 'true'
+        run: |
+          # Recorta a seção da versão: da linha "## vX.Y.Z" até o próximo "## v".
+          # generate_release_notes monta a lista a partir de pull requests, e
+          # como os commits vão direto no master a release saía só com o link de
+          # comparação — o que mudou ficava só no CHANGELOG do repositório.
+          awk -v ver="## v${{ steps.ver.outputs.version }}"             '$0 == ver {f=1; next} f && /^## v/ {exit} f {print}'             CHANGELOG.md > release-notes.md
+          if [ -s release-notes.md ] && grep -q '[^[:space:]]' release-notes.md; then
+            echo "tem=true" >> $GITHUB_OUTPUT
+          else
+            echo "tem=false" >> $GITHUB_OUTPUT
+            echo "Sem seção para v${{ steps.ver.outputs.version }} no CHANGELOG.md — usando só as notas automáticas."
+          fi
+
       - name: Criar GitHub Release
         if: steps.check.outputs.new == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.version }}
           name: v${{ steps.ver.outputs.version }}
+          body_path: ${{ steps.notas.outputs.tem == 'true' && 'release-notes.md' || '' }}
           generate_release_notes: true
