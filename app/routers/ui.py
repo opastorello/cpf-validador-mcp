@@ -637,6 +637,8 @@ _HTML = r"""<!DOCTYPE html>
     const delay = ms => new Promise(r => setTimeout(r, ms));
     const AUTH_REQUIRED = __AUTH_REQUIRED__;
     const USA_CAPTCHA   = __USA_CAPTCHA__;
+    const FONTE_NOME    = "__FONTE_NOME__";
+    const FONTE_ROTULO  = "__FONTE_ROTULO__";
 
     // Uma fonte sem CAPTCHA não pode anunciar que resolveu um. Os rótulos dos
     // passos seguem a capacidade declarada pela fonte ativa.
@@ -1103,10 +1105,13 @@ _HTML = r"""<!DOCTYPE html>
     function histLoad() { try { return JSON.parse(localStorage.getItem(HIST_KEY) || '{}'); } catch { return {}; } }
     function histSave(d) { localStorage.setItem(HIST_KEY, JSON.stringify(d)); }
 
+    // A chave inclui a fonte: o número de certidão é de quem emitiu, então o
+    // mesmo CPF consultado no TRT3 e no TCU são duas entradas, não uma que
+    // sobrescreve a outra.
     function saveToHistory(cpf, nome, numero_certidao, duracao_segundos) {
       if (!isHistoryEnabled()) return;
       const data = histLoad();
-      const key  = cpf;
+      const key  = cpf + '::' + FONTE_NOME;
       const now  = new Date().toISOString();
       if (data[key]) {
         data[key].consultas++;
@@ -1115,7 +1120,8 @@ _HTML = r"""<!DOCTYPE html>
         if (numero_certidao) data[key].numero_certidao = numero_certidao;
         if (duracao_segundos != null) data[key].ultima_duracao_s = Math.round(duracao_segundos * 10) / 10;
       } else {
-        data[key] = { cpf: key, nome, numero_certidao, consultas: 1,
+        data[key] = { cpf, fonte: FONTE_NOME, fonte_rotulo: FONTE_ROTULO,
+          nome, numero_certidao, consultas: 1,
           primeira_consulta: now, ultima_consulta: now,
           ultima_duracao_s: duracao_segundos != null ? Math.round(duracao_segundos * 10) / 10 : null };
       }
@@ -1138,9 +1144,9 @@ _HTML = r"""<!DOCTYPE html>
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
 
-    function deleteHistoryEntry(cpf) {
+    function deleteHistoryEntry(chave) {
       const data = histLoad();
-      delete data[cpf];
+      delete data[chave];
       histSave(data);
       renderHistory();
     }
@@ -1156,18 +1162,19 @@ _HTML = r"""<!DOCTYPE html>
 
     function renderHistory() {
       const data = histLoad();
-      const entries = Object.values(data).sort((a, b) =>
+      const entries = Object.entries(data).sort(([, a], [, b]) =>
         (b.ultima_consulta || '') > (a.ultima_consulta || '') ? 1 : -1);
       if (!entries.length) {
         $histList.innerHTML = '<div class="hist-empty">Nenhuma consulta registrada ainda.</div>';
         return;
       }
-      $histList.innerHTML = entries.map(h => `
+      $histList.innerHTML = entries.map(([key, h]) => `
         <div class="hist-item" onclick="fillFromHistory('${esc(h.cpf)}','${esc(h.nome||'')}')">
           <div style="flex:1;min-width:0">
             <div class="hist-nome">${esc(h.nome) || '—'}</div>
             <div style="font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap">
               <span>${esc(h.cpf)}</span>
+              ${h.fonte ? `<span>${esc(h.fonte_rotulo || h.fonte)}</span>` : ''}
               ${h.numero_certidao ? `<span>Certidão ${esc(h.numero_certidao)}</span>` : ''}
               ${h.ultima_duracao_s != null ? `<span>${esc(h.ultima_duracao_s)}s</span>` : ''}
             </div>
@@ -1177,7 +1184,7 @@ _HTML = r"""<!DOCTYPE html>
             <div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(h.consultas)}× consultado</div>
           </div>
           <button class="hist-del" title="Remover entrada"
-            onclick="event.stopPropagation(); deleteHistoryEntry('${esc(h.cpf)}')">×</button>
+            onclick="event.stopPropagation(); deleteHistoryEntry('${esc(key)}')">×</button>
         </div>`).join('');
     }
 
@@ -1213,4 +1220,5 @@ async def ui():
     usa_captcha = "true" if fonte.usa_captcha else "false"
     return (_HTML.replace("__AUTH_REQUIRED__", auth_required)
                  .replace("__USA_CAPTCHA__", usa_captcha)
-                 .replace("__FONTE_ROTULO__", escape(fonte.rotulo)))
+                 .replace("__FONTE_ROTULO__", escape(fonte.rotulo))
+                 .replace("__FONTE_NOME__", escape(fonte.nome)))
