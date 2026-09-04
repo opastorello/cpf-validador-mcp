@@ -515,8 +515,8 @@ _HTML = r"""<!DOCTYPE html>
         <div class="field">
           <label>CPF</label>
           <input id="cpf" type="text" placeholder="000.000.000-00"
-                 spellcheck="false" autocomplete="off" inputmode="numeric" />
-          <p class="hint">Dígito ilegível? Use <code>X</code> — ex: <code>000.XX0.000-XX</code></p>
+                 spellcheck="false" autocomplete="off" inputmode="tel" />
+          <p class="hint">Dígito ilegível? Use <code>*</code>, <code>X</code>, <code>?</code>, <code>_</code> ou <code>#</code> — ex: <code>***.444.777-**</code></p>
         </div>
         <div class="field">
           <label>Nome <span style="font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span></label>
@@ -592,7 +592,7 @@ _HTML = r"""<!DOCTYPE html>
     /* ── CPF mask ── */
     $cpf.addEventListener('input', function() {
       const prev = this.value, pos = this.selectionStart;
-      let raw = prev.replace(/[^\dxX]/g,'').toUpperCase().slice(0,11);
+      let raw = prev.replace(/[xX?_#]/g,'*').replace(/[^\d*]/g,'').slice(0,11);
       let fmt = raw;
       if (raw.length > 9)      fmt = raw.slice(0,3)+'.'+raw.slice(3,6)+'.'+raw.slice(6,9)+'-'+raw.slice(9);
       else if (raw.length > 6) fmt = raw.slice(0,3)+'.'+raw.slice(3,6)+'.'+raw.slice(6);
@@ -673,8 +673,12 @@ _HTML = r"""<!DOCTYPE html>
       resetLog();
       startTimer();
 
-      const hasMask = /[xX]/.test(cpf);
-      const xs = (cpf.replace(/[^\dxX]/gi,'').match(/x/gi)||[]).length;
+      const rawCpf   = cpf.replace(/[^\d*]/g,'');
+      const hasMask  = rawCpf.includes('*');
+      // só os curingas da base (posições 0-8) geram combinações — os dígitos
+      // verificadores são recalculados pelo servidor, não enumerados
+      const xs       = (rawCpf.slice(0,9).match(/\*/g)||[]).length;
+      const unknowns = (rawCpf.match(/\*/g)||[]).length;
 
       let liveMatches = [];
       let resultados  = [];
@@ -735,7 +739,7 @@ _HTML = r"""<!DOCTYPE html>
             doneStep(s1, `CPF válido — ${vd.cpf_formatado}`);
           }
         } else {
-          doneStep(s1, `Máscara: ${xs} dígito${xs>1?'s':''} desconhecido${xs>1?'s':''}`);
+          doneStep(s1, `Máscara: ${unknowns} dígito${unknowns>1?'s':''} desconhecido${unknowns>1?'s':''}`);
         }
 
         /* 2 — candidatos */
@@ -829,7 +833,7 @@ _HTML = r"""<!DOCTYPE html>
             resultados = liveMatches;
           }
         } else if (hasMask) {
-          const mascara = cpf.toUpperCase().replace(/X/g,'*');
+          const mascara = rawCpf;
           const resp = await fetch('/trt3/buscar-por-mascara/stream', {
             method: 'POST',
             signal,
