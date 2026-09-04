@@ -96,3 +96,36 @@ def test_captcha_errado_reabre_sessao_e_tenta_de_novo(caplog):
     assert "rejeitado" in texto
     assert "nova sessão" in texto
     assert r["encontrado"] is None      # esgotou as 2 tentativas
+
+
+# ── CPF válido no módulo-11 mas inexistente na Receita Federal ─────────────
+
+NAO_CADASTRADO = (
+    __import__("pathlib").Path(__file__).parent / "fixtures" / "trt3_cpf_nao_cadastrado.html"
+).read_text(encoding="utf-8")
+
+
+def test_cpf_nao_cadastrado_nao_vira_retry_de_captcha(caplog):
+    """O TRT3 devolve o formulário — igualzinho a quando recusa o CAPTCHA. Se
+    cair no retry, queima as 20 tentativas e reporta erro de CAPTCHA para um
+    CPF que simplesmente não existe."""
+    resp = _resposta(text=NAO_CADASTRADO)
+    with caplog.at_level(logging.INFO, logger="trt3"):
+        with patch.object(m, "_fetch_page", return_value=("http://x", "vs", "http://c")), \
+             patch.object(m, "_solve_captcha", return_value="abc123") as solve, \
+             patch.object(m, "_post_form", return_value=resp):
+            r = m._consultar_trt3_com_sessao("15187982095", "151.879.820-95")
+
+    assert r["encontrado"] is False
+    assert r["cpf_inexistente"] is True
+    assert "Receita Federal" in r["mensagem"]
+    assert "erro" not in r
+    assert solve.call_count == 1, "resolveu CAPTCHA mais de uma vez"
+    assert "não cadastrado na Receita Federal" in "\n".join(x.getMessage() for x in caplog.records)
+
+
+def test_a_fixture_tem_o_campo_de_captcha():
+    """Se a fixture não tiver o campo, o teste acima passa por acidente: é
+    justamente a presença dele que fazia a resposta ser lida como captcha
+    errado."""
+    assert "form:verifyCaptcha_" in NAO_CADASTRADO

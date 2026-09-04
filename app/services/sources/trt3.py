@@ -212,6 +212,27 @@ def _consultar_trt3_com_sessao(cpf_limpo: str, cpf_fmt: str) -> dict:
                          cpf_log, dados.get("tipo_certidao", "?"), attempts, dt)
                 return {"cpf": cpf_fmt, "encontrado": True, **dados}
 
+            # "CPF/CNPJ não encontrado na Receita Federal": o TRT3 devolve o
+            # formulário de volta, exatamente como faz quando o CAPTCHA é
+            # recusado. Precisa vir ANTES da checagem de captcha, senão a
+            # resposta cai no retry e queima todas as tentativas — numa busca
+            # por máscara, onde a maioria dos candidatos não é cadastrada, isso
+            # multiplicava por 20 as requisições ao tribunal.
+            if re.search(r"n[ãa]o encontrado na Receita Federal", resp.text, re.IGNORECASE):
+                _m.trt3_captcha_result_total.labels(result="success").inc()
+                _m.trt3_captcha_retries_per_query.observe(attempts)
+                _m.trt3_queries_total.labels(result="not_registered").inc()
+                dt = time.time() - t_query_start
+                _m.trt3_query_duration_seconds.observe(dt)
+                log.info("CPF não cadastrado na Receita Federal cpf=%s tentativas=%d em %.1fs",
+                         cpf_log, attempts, dt)
+                return {
+                    "cpf": cpf_fmt,
+                    "encontrado": False,
+                    "cpf_inexistente": True,
+                    "mensagem": "CPF não encontrado na Receita Federal.",
+                }
+
             # CAPTCHA errado: TRT3 devolve o formulário — próxima iteração busca página fresca
             captcha_invalido = re.search(
                 r"captcha inv[aá]lido|c[oó]digo incorreto|tente novamente|caracteres da imagem|caracteres da figura",
