@@ -682,6 +682,17 @@ _HTML = r"""<!DOCTYPE html>
 
       let liveMatches = [];
       let resultados  = [];
+      let inexistente = false;   // CPF válido no módulo-11 que não existe na Receita
+      let inexistentes = 0;      // idem, contados numa busca em lote
+
+      // Candidatos que o TRT3 respondeu "não existe na Receita Federal": numa
+      // busca por máscara costumam ser a maioria, e dizer isso explica por que
+      // tantos candidatos não deram em nada.
+      function contaInexistentes(payload) {
+        const r = payload && payload.resultados;
+        if (!r) return 0;
+        return Object.values(r).filter(x => x && x.cpf_inexistente).length;
+      }
 
       function renderLive() {
         if (!liveMatches.length) return;
@@ -830,6 +841,7 @@ _HTML = r"""<!DOCTYPE html>
             }
             if (!vfinal) throw new Error('Stream de variações encerrado sem resultado');
             doneStep(s4, `${totalCandidatos} CAPTCHA${totalCandidatos!==1?'s':''} resolvido${totalCandidatos!==1?'s':''}`);
+            inexistentes = contaInexistentes(vfinal);
             resultados = liveMatches;
           }
         } else if (hasMask) {
@@ -888,19 +900,29 @@ _HTML = r"""<!DOCTYPE html>
           totalCandidatos = finalData.candidatos_gerados || '?';
           s2.querySelector('span:last-child').textContent = `${totalCandidatos} combinaç${totalCandidatos!=1?'ões':'ão'} calculada${totalCandidatos!=1?'s':''}`;
           doneStep(s4, `${totalCandidatos} CAPTCHA${totalCandidatos!=1?'s':''} resolvido${totalCandidatos!=1?'s':''}`);
+          inexistentes = contaInexistentes(finalData);
           resultados = liveMatches;
         } else {
           const res  = await post('/trt3/feitos', {cpf});
           const data = await res.json();
           if (!res.ok) throw new Error(data.detail || 'Erro na consulta');
           doneStep(s4, 'CAPTCHA resolvido');
+          inexistente = !!data.cpf_inexistente;
           if (data.nome_certidao) resultados = [data];
         }
 
         stopTimer();
 
         if (!resultados.length) {
-          $out.innerHTML = `<div class="err-box">⚠️ Nenhum resultado encontrado${nome ? ` para "${esc(nome)}"` : ''}${(hasMask || useVariations) ? ` — ${esc(String(totalCandidatos))} candidatos testados` : ''}.</div>`;
+          if (inexistente) {
+            // Caso distinto de "não tem processos": este CPF não existe.
+            $out.innerHTML = `<div class="err-box">CPF válido no cálculo, mas não existe na Receita Federal — não há titular para consultar.</div>`;
+            return;
+          }
+          const semRegistro = inexistentes
+            ? `, ${esc(String(inexistentes))} deles inexistentes na Receita Federal`
+            : '';
+          $out.innerHTML = `<div class="err-box">⚠️ Nenhum resultado encontrado${nome ? ` para "${esc(nome)}"` : ''}${(hasMask || useVariations) ? ` — ${esc(String(totalCandidatos))} candidatos testados${semRegistro}` : ''}.</div>`;
           return;
         }
 
@@ -927,7 +949,7 @@ _HTML = r"""<!DOCTYPE html>
         });
 
         const metaStr = (hasMask || useVariations) && resultados.length > 1
-          ? `${resultados.length} resultado${resultados.length!==1?'s':''} · ${totalCandidatos} candidatos · ${$el.textContent}`
+          ? `${resultados.length} resultado${resultados.length!==1?'s':''} · ${totalCandidatos} candidatos${inexistentes ? ` · ${inexistentes} inexistentes` : ''} · ${$el.textContent}`
           : resultados.length > 1 ? `${resultados.length} resultados` : '';
 
         const mkCard = d => {
