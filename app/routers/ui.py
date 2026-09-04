@@ -682,8 +682,9 @@ _HTML = r"""<!DOCTYPE html>
 
       let liveMatches = [];
       let resultados  = [];
-      let inexistente = false;   // CPF válido no módulo-11 que não existe na Receita
-      let inexistentes = 0;      // idem, contados numa busca em lote
+      let inexistente = false;   // CPF válido no cálculo que a fonte não reconhece
+      let msgInexistente = '';   // o texto vem da fonte: cada uma tem o seu
+      let inexistentes = 0;      // quantos assim numa busca em lote
 
       // Candidatos que o TRT3 respondeu "não existe na Receita Federal": numa
       // busca por máscara costumam ser a maioria, e dizer isso explica por que
@@ -908,6 +909,7 @@ _HTML = r"""<!DOCTYPE html>
           if (!res.ok) throw new Error(data.detail || 'Erro na consulta');
           doneStep(s4, 'CAPTCHA resolvido');
           inexistente = !!data.cpf_inexistente;
+          msgInexistente = data.mensagem || '';
           if (data.nome_certidao) resultados = [data];
         }
 
@@ -915,12 +917,15 @@ _HTML = r"""<!DOCTYPE html>
 
         if (!resultados.length) {
           if (inexistente) {
-            // Caso distinto de "não tem processos": este CPF não existe.
-            $out.innerHTML = `<div class="err-box">CPF válido no cálculo, mas não existe na Receita Federal — não há titular para consultar.</div>`;
+            // Caso distinto de "não tem processos": a fonte não reconhece o CPF.
+            // O texto vem da fonte — "Receita Federal" é vocabulário do TRT3 e
+            // não valeria para outra fonte.
+            const msg = msgInexistente || 'CPF válido no cálculo, mas não consta na fonte consultada.';
+            $out.innerHTML = `<div class="err-box">⚠️ ${esc(msg)}</div>`;
             return;
           }
           const semRegistro = inexistentes
-            ? `, ${esc(String(inexistentes))} deles inexistentes na Receita Federal`
+            ? `, ${esc(String(inexistentes))} deles não reconhecidos pela fonte`
             : '';
           $out.innerHTML = `<div class="err-box">⚠️ Nenhum resultado encontrado${nome ? ` para "${esc(nome)}"` : ''}${(hasMask || useVariations) ? ` — ${esc(String(totalCandidatos))} candidatos testados${semRegistro}` : ''}.</div>`;
           return;

@@ -51,6 +51,12 @@ class Fonte(ABC):
         ``nome_certidao`` str            Nome do titular. É por ele que o filtro
                                          ``nome=`` das buscas em lote decide o match.
         ``erro``        str              Presente apenas quando a consulta falhou.
+        ``cpf_inexistente`` bool         A fonte respondeu que este CPF não existe —
+                                         diferente de existir e não ter registro.
+                                         Acompanha ``encontrado=False``.
+        ``mensagem``    str              Texto exibido ao usuário quando não há
+                                         resultado. É da fonte: a interface o mostra
+                                         como veio, sem reescrever.
         ==============  ===============  ==================================================
 
         Qualquer chave extra (``tipo_certidao``, ``valida_ate``, ``pdf_url``…)
