@@ -55,6 +55,9 @@ O histórico é **local ao navegador** — fica no `localStorage` da interface w
 
 - **Interface web:** o toggle na aba Histórico ativa ou desativa o salvamento automático; a preferência também é salva no `localStorage`.
 - **REST API / MCP:** não gravam histórico — cada cliente registra o que quiser do seu lado.
+- **Por fonte:** a chave é `cpf::fonte`, então o mesmo CPF consultado no TRT3 e no TCU são duas
+  entradas. Certidão é documento de quem emitiu; uma entrada só guardaria um número que não
+  corresponde ao que está exibido.
 
 ---
 
@@ -68,6 +71,8 @@ app/
 ├── config.py           # Lê todas as variáveis de ambiente com defaults
 ├── mcp_server.py       # FastMCP("cpf-validador") — 6 tools
 ├── auth.py             # TokenMiddleware — autenticação via API_TOKEN + controle prod/dev
+├── rate_limit.py       # Limiter compartilhado por main.py e routers/consulta.py
+├── metrics.py          # Métricas Prometheus
 ├── services/
 │   ├── cpf.py          # Validação, variações e geração por máscara (zero deps de framework)
 │   └── sources/        # Fontes de consulta — escolhidas por SOURCE no .env
@@ -166,6 +171,9 @@ O contrato do retorno é este — só estas chaves são interpretadas:
     "cpf": "151.879.820-95",       # obrigatório, formatado
     "encontrado": True,            # True achou | False não consta | None erro
     "nome_certidao": "FULANO",     # o filtro nome= das buscas em lote depende desta chave
+    "tem_registro": False,         # a certidão é positiva? (há processo/conta irregular)
+    "cpf_inexistente": False,      # a fonte não reconhece o CPF — acompanha encontrado=False
+    "mensagem": "...",             # texto exibido ao usuário; use as constantes MSG_* de base.py
     "erro": "...",                 # só quando a consulta falhou
 }
 ```
@@ -265,6 +273,27 @@ A interface web (`/`) exibe um **gate de autenticação** quando `API_TOKEN` est
 
 ---
 
+## 📊 Métricas
+
+`GET /metrics` expõe métricas Prometheus. Os nomes separam o que vale para qualquer fonte do
+que é de uma só:
+
+| Prefixo | Exemplos | O que mede |
+| ------- | -------- | ---------- |
+| `consulta_*` | `consulta_queries_total{fonte,result}`, `consulta_duration_seconds{fonte}`, `consulta_cpf_total`, `consulta_matches_total` | A consulta em si, com label `fonte`. Contadas num ponto só, então toda fonte é medida igual |
+| `trt3_*` | `trt3_captcha_attempts_total`, `trt3_captcha_result_total`, `trt3_pdf_parsed_total`, `trt3_session_resets_total` | Específicas do scraping do TRT3 |
+| `tcu_*` | `tcu_pow_duration_seconds`, `tcu_pow_counter`, `tcu_concurrent_queries`, `tcu_http_errors_total` | Específicas do proof-of-work do TCU |
+| `cpf_*` | `cpf_validations_total`, `cpf_mask_searches_total`, `cpf_bulk_size` | Operações de CPF, sem rede |
+| — | `mcp_calls_total{tool,result}`, `http_rate_limit_total{endpoint}` | Uso da aplicação |
+
+O resultado de `consulta_queries_total` distingue `found`, `not_found`, `not_registered`
+(o CPF não existe na base), `indeterminate` e `error`.
+
+Em `production` a rota exige token; `METRICS_PUBLIC=true` abre. Configure `bearer_token` no
+Prometheus se mantiver fechada.
+
+---
+
 ## 🚀 Instalação
 
 ### Docker (recomendado)
@@ -279,7 +308,8 @@ docker compose up --build -d
 ### Local
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-trt3.txt   # inclui o PyTorch da CRNN do TRT3
+# sem usar SOURCE=trt3? `pip install -r requirements.txt` basta e evita ~780 MB
 cp .env.example .env
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
@@ -445,8 +475,9 @@ python -m app.captcha.registry
 | [FastAPI](https://github.com/fastapi/fastapi) | REST API |
 | [slowapi](https://github.com/laurentS/slowapi) | Rate limiting por IP |
 | [curl-cffi](https://github.com/yifeikong/curl-cffi) | HTTP com impersonação TLS Chrome-124 |
-| [PyTorch](https://github.com/pytorch/pytorch) | Rede neural CRNN para CAPTCHA |
-| [torchvision](https://github.com/pytorch/vision) | Transforms e augmentation de imagem |
+| [altcha-solver](https://github.com/opastorello/altcha-solver) | Proof-of-work do CAPTCHA Altcha (fonte TCU) |
+| [PyTorch](https://github.com/pytorch/pytorch) | Rede neural CRNN para o CAPTCHA de imagem (fonte TRT3, opcional) |
+| [torchvision](https://github.com/pytorch/vision) | Transforms e augmentation de imagem (fonte TRT3, opcional) |
 | [pypdf](https://github.com/py-pdf/pypdf) | Extração de dados do PDF de certidão |
 | [Pillow](https://github.com/python-pillow/Pillow) | Processamento de imagem |
 | [python-dotenv](https://github.com/theskumar/python-dotenv) | Carregamento de variáveis do `.env` |

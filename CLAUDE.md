@@ -39,6 +39,7 @@ app/
 ├── config.py         # Lê todas as variáveis de ambiente com defaults
 ├── mcp_server.py     # FastMCP("cpf-validador") — 6 tools wrapping services
 ├── auth.py           # TokenMiddleware — autenticação via API_TOKEN + controle prod/dev via ENV
+├── rate_limit.py     # Limiter compartilhado — main.py e routers/consulta.py precisam do mesmo objeto
 ├── services/
 │   ├── cpf.py        # Lógica pura de CPF (zero deps de framework)
 │   └── sources/      # Fontes de consulta — a fonte ativa vem de SOURCE no .env
@@ -92,6 +93,9 @@ app/
 | GET | `/auth/check` | — | Valida o token (401 se inválido) — usado pelo gate da UI |
 | GET | `/health` | — | Health check (sempre aberto — healthcheck do Docker) |
 | GET | `/metrics` | — | Métricas Prometheus (token em `production`) |
+
+Campos do retorno de consulta: `cpf`, `encontrado`, `nome_certidao`, `tem_registro`,
+`cpf_inexistente`, `mensagem`, `erro` — descritos em `base.Fonte.consultar`.
 
 ### Autenticação
 - `API_TOKEN` vazio → servidor sem autenticação
