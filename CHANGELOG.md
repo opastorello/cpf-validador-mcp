@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.0.1
+
+- **Token com caractere não-ASCII derrubava a rota com 500** em vez de devolver
+  401. `hmac.compare_digest` com `str` exige ASCII dos dois lados e levanta
+  `TypeError` fora disso; como o cabeçalho HTTP é latin-1, bastava um acento no
+  token guardado no navegador para o middleware estourar — e qualquer cliente
+  podia provocar erro no servidor de propósito. A comparação passa a ser em
+  bytes, que vale para qualquer entrada e continua sendo de tempo constante.
+
 ## v2.0.0
 
 Consultar CPF deixou de ser "consultar o TRT3". A aplicação passa a ter uma

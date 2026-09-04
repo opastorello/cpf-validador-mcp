@@ -235,3 +235,36 @@ def test_limiter_e_o_mesmo_objeto_nas_duas_pontas(client):
 
     assert client.app.state.limiter is limiter
     assert consulta.limiter is limiter
+
+
+def test_token_nao_ascii_devolve_401_e_nao_500():
+    """Cabeçalho HTTP é latin-1: o uvicorn decodifica os bytes e entrega uma str
+    que pode ter caractere fora do ASCII. `hmac.compare_digest` com str exige
+    ASCII dos dois lados e levanta TypeError — em produção isso virou 500 em vez
+    de 401, e um jeito trivial de provocar erro no servidor."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    import app.auth as _auth
+    from app.auth import TokenMiddleware
+
+    app_teste = FastAPI()
+    app_teste.add_middleware(TokenMiddleware)
+
+    @app_teste.get("/protegida")
+    async def protegida():
+        return {"ok": True}
+
+    token_original = _auth._TOKEN
+    _auth._TOKEN = "token-ascii"
+    try:
+        with TestClient(app_teste) as c:
+            # bytes latin-1, que é exatamente o que chega pela rede
+            for ruim in ("tokén-acentuado", "tökèn", "señha"):
+                r = c.get("/protegida",
+                          headers={"Authorization": f"Bearer {ruim}".encode("latin-1")})
+                assert r.status_code == 401, f"{ruim!r} devolveu {r.status_code}"
+            assert c.get("/protegida",
+                         headers={"Authorization": "Bearer token-ascii"}).status_code == 200
+    finally:
+        _auth._TOKEN = token_original

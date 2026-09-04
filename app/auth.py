@@ -34,7 +34,12 @@ class TokenMiddleware(BaseHTTPMiddleware):
         if not auth.startswith("Bearer "):
             return JSONResponse({"detail": "Unauthorized"}, status_code=401)
 
-        if not hmac.compare_digest(auth[7:], _TOKEN):
+        # Compara em bytes: com str, compare_digest exige ASCII puro dos dois
+        # lados e levanta TypeError se o cliente mandar qualquer caractere fora
+        # disso — virando 500 no lugar de 401, e um jeito trivial de provocar
+        # erro no servidor. Em bytes vale para qualquer entrada e continua
+        # sendo comparação de tempo constante.
+        if not hmac.compare_digest(auth[7:].encode("utf-8"), _TOKEN.encode("utf-8")):
             return JSONResponse({"detail": "Unauthorized"}, status_code=401)
 
         return await call_next(request)
