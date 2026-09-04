@@ -1,10 +1,14 @@
-import re
 import io
-import time
 import logging
+import re
 import threading
-from pypdf import PdfReader
+import time
+
 from curl_cffi import requests as _requests
+from pypdf import PdfReader
+
+from app import config as _cfg
+from app import metrics as _m
 from app.captcha.predictor import predict as _solve_captcha
 from app.services.cpf import formatar
 from app.services.sources.base import (
@@ -14,8 +18,6 @@ from app.services.sources.base import (
     Fonte,
     mascarar_cpf,
 )
-from app import config as _cfg
-from app import metrics as _m
 
 log = logging.getLogger("trt3")
 

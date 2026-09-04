@@ -7,7 +7,6 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -15,6 +14,7 @@ from fastapi.testclient import TestClient
 @pytest.fixture(scope="module")
 def client():
     from contextlib import asynccontextmanager
+
     import app.auth as _auth
     _auth._TOKEN = ""  # garante que o client de teste roda sem autenticação
     from app.main import app
@@ -230,8 +230,8 @@ def test_caminho_antigo_trt3_nao_existe_mais(client):
 def test_limiter_e_o_mesmo_objeto_nas_duas_pontas(client):
     """Os decoradores contam num limiter e o handler de 429 lê o de
     app.state — se forem instâncias diferentes, cada uma tem o seu storage."""
-    from app.routers import consulta
     from app.rate_limit import limiter
+    from app.routers import consulta
 
     assert client.app.state.limiter is limiter
     assert consulta.limiter is limiter

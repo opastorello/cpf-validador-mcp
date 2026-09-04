@@ -11,10 +11,9 @@ import hashlib
 import json
 from unittest.mock import MagicMock, patch
 
-
 from app.services.sources import tcu as m
 from app.services.sources.base import MSG_CPF_INEXISTENTE
-from app.services.sources.tcu import TCU, _SOLVER, _parse_resposta
+from app.services.sources.tcu import _SOLVER, TCU, _parse_resposta
 
 CPF = "15187982095"
 CPF_FMT = "151.879.820-95"

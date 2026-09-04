@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from app.services.cpf import validate_cpf, generate_valid_variations
+
 from app import metrics as _m
+from app.services.cpf import generate_valid_variations, validate_cpf
 
 
 class CpfRequest(BaseModel):

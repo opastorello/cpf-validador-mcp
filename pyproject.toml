@@ -1,0 +1,23 @@
+[tool.ruff]
+# O lint precisa dar o mesmo resultado na máquina de quem desenvolve e no CI.
+# Sem esta configuração o ruff usa os defaults da versão instalada, e como
+# requirements-dev pedia `ruff>=0.4.0`, uma versão nova com mais regras no
+# default derrubava o CI sem ninguém ter tocado no código — foi o que aconteceu
+# entre a 0.15 e a 0.16.
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# Conjunto explícito: erros de sintaxe e nomes (E4/E7/E9/F), que é o que o
+# projeto sempre respeitou, mais ordenação de imports (I).
+#
+# Ficaram de fora, deliberadamente:
+#   BLE001 — `except Exception` é intencional aqui. `Fonte.consultar` não pode
+#            levantar: quem chama roda centenas em paralelo e trata ausência de
+#            resultado, não stack trace. O contrato está em base.Fonte.consultar
+#   SIM117 — `with` aninhado nos testes deixa claro o que cada patch cobre
+#   RUF059 — desempacotamento com variável não usada é legível em tuplas do TRT3
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]

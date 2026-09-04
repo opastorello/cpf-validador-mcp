@@ -12,7 +12,6 @@ from abc import ABC, abstractmethod
 
 from app.services.cpf import formatar
 
-
 # Mensagens exibidas ao usuário quando não há resultado. Ficam aqui, e não
 # dentro de cada fonte, para que todas digam a mesma coisa nos mesmos casos: o
 # usuário não deve descobrir qual fonte respondeu pelo texto da mensagem. Uma

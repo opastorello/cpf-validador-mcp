@@ -6,9 +6,9 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
 
-from app.captcha.model import BLANK, CaptchaModel
 from app.captcha.dataset import CaptchaDataset, collate_fn
-from app.captcha.registry import next_version, save_version, promote_if_best
+from app.captcha.model import BLANK, CaptchaModel
+from app.captcha.registry import next_version, promote_if_best, save_version
 
 MODEL_PATH = Path(__file__).parent / "captcha_model.pt"
 DATA_DIR = Path(__file__).parent / "data"

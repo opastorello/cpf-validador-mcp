@@ -1,11 +1,12 @@
-from pathlib import Path
-import torch
-from PIL import Image
-import torchvision.transforms as T
 import io
+from pathlib import Path
 
-from app.captcha.model import CaptchaModel, decode_greedy, IMG_H, IMG_W
+import torch
+import torchvision.transforms as T
+from PIL import Image
+
 from app import config as _cfg
+from app.captcha.model import IMG_H, IMG_W, CaptchaModel, decode_greedy
 
 _custom = _cfg.CAPTCHA_MODEL_PATH
 MODEL_PATH = Path(_custom) if _custom else Path(__file__).parent / "captcha_model.pt"

@@ -1,9 +1,10 @@
-import re
-import time
-import sys
 import argparse
+import re
+import sys
 import threading
+import time
 from pathlib import Path
+
 from curl_cffi import requests as _requests
 
 _MODEL_PT = Path(__file__).parent / "captcha_model.pt"

@@ -1,10 +1,15 @@
-from fastmcp import FastMCP
 import re
+
+from fastmcp import FastMCP
 from starlette.concurrency import run_in_threadpool
-from app.services.cpf import validate_cpf as _validate_cpf, generate_valid_variations as _generate_valid_variations, gerar_cpfs_de_mascara, is_valido, formatar
-from app.services.sources import consultar as consultar_fonte, consultar_multiplos
+
 from app import config as _cfg
 from app import metrics as _m
+from app.services.cpf import formatar, gerar_cpfs_de_mascara, is_valido
+from app.services.cpf import generate_valid_variations as _generate_valid_variations
+from app.services.cpf import validate_cpf as _validate_cpf
+from app.services.sources import consultar as consultar_fonte
+from app.services.sources import consultar_multiplos
 
 mcp = FastMCP("cpf-validador")
 

@@ -1,8 +1,10 @@
 from pathlib import Path
-from PIL import Image
+
 import torch
-from torch.utils.data import Dataset
 import torchvision.transforms as T
+from PIL import Image
+from torch.utils.data import Dataset
+
 from app.captcha.model import CHARSET, IMG_H, IMG_W
 
 

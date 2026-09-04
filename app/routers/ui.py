@@ -2,6 +2,7 @@ from html import escape
 
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
+
 from app.auth import _TOKEN
 from app.services.sources import get_fonte
 

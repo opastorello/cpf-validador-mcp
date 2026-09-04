@@ -1,16 +1,18 @@
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
 import asyncio
 import json
 import re
 import threading
+
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
-from app.services.cpf import is_valido, formatar, gerar_cpfs_de_mascara
-from app.services.sources import consultar, consultar_multiplos
-from app.rate_limit import limiter
+
 from app import config as _cfg
 from app import metrics as _m
+from app.rate_limit import limiter
+from app.services.cpf import formatar, gerar_cpfs_de_mascara, is_valido
+from app.services.sources import consultar, consultar_multiplos
 
 _EXAMPLE_CPF = {
     "cpf": "151.879.820-95",

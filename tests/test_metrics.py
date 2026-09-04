@@ -11,9 +11,11 @@ import pytest
 @pytest.fixture(scope="module")
 def client():
     from contextlib import asynccontextmanager
+
     import app.auth as _auth
     _auth._TOKEN = ""
     from fastapi.testclient import TestClient
+
     from app.main import app
 
     @asynccontextmanager
