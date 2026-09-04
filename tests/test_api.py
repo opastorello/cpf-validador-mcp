@@ -79,28 +79,28 @@ def test_cpf_variations(client):
 
 
 # ---------------------------------------------------------------------------
-# POST /trt3/feitos
+# POST /consulta/feitos
 # ---------------------------------------------------------------------------
 
 def test_trt3_feitos_cpf_invalido(client):
-    r = client.post("/trt3/feitos", json={"cpf": "111.111.111-11"})
+    r = client.post("/consulta/feitos", json={"cpf": "111.111.111-11"})
     assert r.status_code == 422
 
 
 def test_trt3_feitos_cpf_curto(client):
-    r = client.post("/trt3/feitos", json={"cpf": "123"})
+    r = client.post("/consulta/feitos", json={"cpf": "123"})
     assert r.status_code == 422
 
 
 def test_trt3_feitos_sucesso(client):
-    with patch("app.routers.trt3.consultar", return_value=MOCK_FEITOS):
-        r = client.post("/trt3/feitos", json={"cpf": "151.879.820-95"})
+    with patch("app.routers.consulta.consultar", return_value=MOCK_FEITOS):
+        r = client.post("/consulta/feitos", json={"cpf": "151.879.820-95"})
     assert r.status_code == 200
     assert r.json()["cpf"] == "15187982095"
 
 
 def test_trt3_feitos_payload_invalido(client):
-    r = client.post("/trt3/feitos", json={})
+    r = client.post("/consulta/feitos", json={})
     assert r.status_code == 422
 
 
@@ -170,7 +170,7 @@ def test_auth_com_api_token(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# POST /trt3/buscar-por-mascara — formatos de máscara
+# POST /consulta/buscar-por-mascara — formatos de máscara
 # ---------------------------------------------------------------------------
 
 def test_buscar_por_mascara_aceita_formato_alternativo(client):
@@ -181,21 +181,21 @@ def test_buscar_por_mascara_aceita_formato_alternativo(client):
         capturado["candidatos"] = candidatos
         return {"total": len(candidatos), "matches": {}, "resultados": {}}
 
-    with patch("app.routers.trt3.consultar_multiplos", side_effect=_fake):
-        r = client.post("/trt3/buscar-por-mascara", json={"mascara": "___.879.820-__"})
+    with patch("app.routers.consulta.consultar_multiplos", side_effect=_fake):
+        r = client.post("/consulta/buscar-por-mascara", json={"mascara": "___.879.820-__"})
 
     assert r.status_code == 200
     assert "15187982095" in capturado["candidatos"]
 
 
 def test_buscar_por_mascara_caractere_invalido(client):
-    r = client.post("/trt3/buscar-por-mascara", json={"mascara": "151.879.82A-95"})
+    r = client.post("/consulta/buscar-por-mascara", json={"mascara": "151.879.82A-95"})
     assert r.status_code == 422
     assert "Caractere inválido" in r.json()["detail"]
 
 
 # ---------------------------------------------------------------------------
-# POST /trt3/feitos-multiplos — semântica de total
+# POST /consulta/feitos-multiplos — semântica de total
 # ---------------------------------------------------------------------------
 
 def test_multiplos_total_conta_recebidos_e_consultados(client):
@@ -204,8 +204,8 @@ def test_multiplos_total_conta_recebidos_e_consultados(client):
     def _fake(cpfs, nome=None, workers=None, **kw):
         return {"total": len(cpfs), "matches": {}, "resultados": {}}
 
-    with patch("app.routers.trt3.consultar_multiplos", side_effect=_fake):
-        r = client.post("/trt3/feitos-multiplos",
+    with patch("app.routers.consulta.consultar_multiplos", side_effect=_fake):
+        r = client.post("/consulta/feitos-multiplos",
                         json={"cpfs": ["151.879.820-95", "111.111.111-11"]})
 
     d = r.json()
@@ -215,8 +215,13 @@ def test_multiplos_total_conta_recebidos_e_consultados(client):
 
 
 def test_multiplos_sem_nenhum_cpf_valido(client):
-    r = client.post("/trt3/feitos-multiplos", json={"cpfs": ["111.111.111-11", "abc"]})
+    r = client.post("/consulta/feitos-multiplos", json={"cpfs": ["111.111.111-11", "abc"]})
     d = r.json()
     assert d["total"] == 2
     assert d["total_consultados"] == 0
     assert len(d["erros"]) == 2
+
+
+def test_caminho_antigo_trt3_nao_existe_mais(client):
+    """/trt3/* foi removido: os caminhos não citam mais a fonte."""
+    assert client.post("/trt3/feitos", json={"cpf": "151.879.820-95"}).status_code == 404

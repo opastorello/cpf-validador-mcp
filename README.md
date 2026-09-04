@@ -40,10 +40,10 @@ Para confirmar a titularidade de um CPF, o sistema consulta o **TRT3** — que e
 | `GET`  | `/` | — | Interface web |
 | `POST` | `/cpf/validate` | — | Valida um CPF matematicamente |
 | `POST` | `/cpf/variations` | — | Gera variações válidas de um CPF |
-| `POST` | `/trt3/feitos` | 10/min por IP | Confirma titularidade de um CPF via TRT3 |
-| `POST` | `/trt3/feitos-multiplos` | 5/min por IP | Confirma lista de CPFs em paralelo |
-| `POST` | `/trt3/buscar-por-mascara` | 3/min por IP | Descobre CPF por máscara com curingas |
-| `POST` | `/trt3/buscar-por-variacoes` | 3/min por IP | Descobre CPF correto a partir de variações |
+| `POST` | `/consulta/feitos` | 10/min por IP | Confirma titularidade de um CPF na fonte ativa |
+| `POST` | `/consulta/feitos-multiplos` | 5/min por IP | Confirma lista de CPFs em paralelo |
+| `POST` | `/consulta/buscar-por-mascara` | 3/min por IP | Descobre CPF por máscara com curingas |
+| `POST` | `/consulta/buscar-por-variacoes` | 3/min por IP | Descobre CPF correto a partir de variações |
 | `GET`  | `/auth/check` | — | Valida o token — `401` se ausente/incorreto, `200` se válido |
 | `GET`  | `/health` | — | Health check — retorna `{"status": "ok"}` |
 
@@ -77,7 +77,7 @@ app/
 │       └── exemplo.py    # Modelo para novas fontes (fictícia, sem rede)
 ├── routers/
 │   ├── cpf.py          # POST /cpf/validate, POST /cpf/variations
-│   ├── trt3.py         # POST /trt3/feitos, /feitos-multiplos, /buscar-por-mascara, /buscar-por-variacoes
+│   ├── consulta.py     # POST /consulta/feitos, /feitos-multiplos, /buscar-por-mascara, /buscar-por-variacoes
 │   └── ui.py           # GET / — interface web
 └── captcha/
     ├── model.py        # Arquitetura CRNN (CNN + BiLSTM + CTC Loss)
@@ -161,10 +161,10 @@ Todas as opções são lidas de variáveis de ambiente ou do arquivo `.env` na r
 | `MAX_WORKERS` | `20` | Limite máximo de `workers` que o cliente pode solicitar |
 | `TASK_TIMEOUT` | `60` | Timeout (segundos) por CPF individual em consultas paralelas |
 | `MAX_WILDCARDS_IN_MASK` | `5` | Máximo de curingas na parte base da máscara (evita explosão combinatória) |
-| `RATE_LIMIT_FEITOS` | `10/minute` | Rate limit de `/trt3/feitos` por IP |
-| `RATE_LIMIT_MULTIPLOS` | `5/minute` | Rate limit de `/trt3/feitos-multiplos` por IP |
-| `RATE_LIMIT_MASK` | `3/minute` | Rate limit de `/trt3/buscar-por-mascara` por IP |
-| `RATE_LIMIT_VARIACOES` | `3/minute` | Rate limit de `/trt3/buscar-por-variacoes` por IP |
+| `RATE_LIMIT_FEITOS` | `10/minute` | Rate limit de `/consulta/feitos` por IP |
+| `RATE_LIMIT_MULTIPLOS` | `5/minute` | Rate limit de `/consulta/feitos-multiplos` por IP |
+| `RATE_LIMIT_MASK` | `3/minute` | Rate limit de `/consulta/buscar-por-mascara` por IP |
+| `RATE_LIMIT_VARIACOES` | `3/minute` | Rate limit de `/consulta/buscar-por-variacoes` por IP |
 | `CAPTCHA_MODEL_PATH` | *(vazio — usa `app/captcha/captcha_model.pt`)* | Path absoluto para o modelo `.pt` (útil para montar modelo externo) |
 | `METRICS_PUBLIC` | `false` | `true` abre `/metrics` sem token também em `production` |
 | `LOG_LEVEL` | `INFO` | Nível de log da consulta ao TRT3. `DEBUG` mostra cada tentativa de CAPTCHA |
@@ -197,7 +197,7 @@ Authorization: Bearer meu-token-secreto
 **REST:**
 
 ```bash
-curl -X POST http://localhost:8000/trt3/feitos \
+curl -X POST http://localhost:8000/consulta/feitos \
   -H "Authorization: Bearer meu-token-secreto" \
   -H "Content-Type: application/json" \
   -d '{"cpf": "151.879.820-95"}'
@@ -262,7 +262,7 @@ curl -X POST http://localhost:8000/cpf/validate \
 ### Confirmar titularidade
 
 ```bash
-curl -X POST http://localhost:8000/trt3/feitos \
+curl -X POST http://localhost:8000/consulta/feitos \
   -H "Content-Type: application/json" \
   -d '{"cpf": "151.879.820-95"}'
 ```
@@ -282,7 +282,7 @@ curl -X POST http://localhost:8000/trt3/feitos \
 Quando você conhece apenas parte dos dígitos — substitua os desconhecidos por `*`:
 
 ```bash
-curl -X POST http://localhost:8000/trt3/buscar-por-mascara \
+curl -X POST http://localhost:8000/consulta/buscar-por-mascara \
   -H "Content-Type: application/json" \
   -d '{"mascara": "***.123.456-**", "nome": "João Silva"}'
 ```
@@ -309,7 +309,7 @@ Um caractere que não seja dígito, curinga ou separador é rejeitado com `422` 
 ### Recuperar CPF com erros ou dígito faltando
 
 ```bash
-curl -X POST http://localhost:8000/trt3/buscar-por-variacoes \
+curl -X POST http://localhost:8000/consulta/buscar-por-variacoes \
   -H "Content-Type: application/json" \
   -d '{"cpf_parcial": "1518798209", "nome": "joao"}'
 ```
@@ -317,7 +317,7 @@ curl -X POST http://localhost:8000/trt3/buscar-por-variacoes \
 ### Consulta em lote
 
 ```bash
-curl -X POST http://localhost:8000/trt3/feitos-multiplos \
+curl -X POST http://localhost:8000/consulta/feitos-multiplos \
   -H "Content-Type: application/json" \
   -d '{"cpfs": ["151.879.820-95", "151.879.821-76"], "workers": 4}'
 ```

@@ -115,12 +115,12 @@ cpf_variation_candidates_total = Counter(
 
 cpf_bulk_queries_total = Counter(
     "cpf_bulk_queries_total",
-    "Chamadas ao endpoint /trt3/feitos-multiplos",
+    "Chamadas ao endpoint /consulta/feitos-multiplos",
 )
 
 cpf_bulk_size = Histogram(
     "cpf_bulk_size",
-    "Quantidade de CPFs por chamada ao /trt3/feitos-multiplos",
+    "Quantidade de CPFs por chamada ao /consulta/feitos-multiplos",
     buckets=[1, 2, 5, 10, 20, 50, 100],
 )
 

@@ -792,7 +792,7 @@ _HTML = r"""<!DOCTYPE html>
           const recalcCpf = variations[0]?.cpf_numeros;
           let found = false;
           if (recalcCpf) {
-            const fastRes  = await post('/trt3/feitos', {cpf: recalcCpf});
+            const fastRes  = await post('/consulta/feitos', {cpf: recalcCpf});
             const fastData = await fastRes.json();
             if (fastRes.ok && fastData.nome_certidao) {
               const bate = !nome || nomeMatch(fastData.nome_certidao, nome);
@@ -805,7 +805,7 @@ _HTML = r"""<!DOCTYPE html>
           }
           if (!found) {
             s4.querySelector('span:last-child').textContent = `Expandindo — 0/${totalCandidatos} variações…`;
-            const vresp = await fetch('/trt3/buscar-por-variacoes/stream', {
+            const vresp = await fetch('/consulta/buscar-por-variacoes/stream', {
               method: 'POST', signal,
               headers: {'Content-Type': 'application/json', ...authH()},
               body: JSON.stringify({cpf_parcial: cpf, nome, workers: 8}),
@@ -847,7 +847,7 @@ _HTML = r"""<!DOCTYPE html>
           }
         } else if (hasMask) {
           const mascara = rawCpf;
-          const resp = await fetch('/trt3/buscar-por-mascara/stream', {
+          const resp = await fetch('/consulta/buscar-por-mascara/stream', {
             method: 'POST',
             signal,
             headers: {'Content-Type': 'application/json', ...authH()},
@@ -904,7 +904,7 @@ _HTML = r"""<!DOCTYPE html>
           inexistentes = contaInexistentes(finalData);
           resultados = liveMatches;
         } else {
-          const res  = await post('/trt3/feitos', {cpf});
+          const res  = await post('/consulta/feitos', {cpf});
           const data = await res.json();
           if (!res.ok) throw new Error(data.detail || 'Erro na consulta');
           doneStep(s4, 'CAPTCHA resolvido');

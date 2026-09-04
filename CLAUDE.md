@@ -48,7 +48,7 @@ app/
 │       └── exemplo.py  # Modelo para novas fontes — fictícia, sem rede e sem CAPTCHA
 ├── routers/
 │   ├── cpf.py        # POST /cpf/validate, POST /cpf/variations
-│   ├── trt3.py       # POST /trt3/feitos, /feitos-multiplos, /buscar-por-mascara, /buscar-por-variacoes
+│   ├── consulta.py   # POST /consulta/feitos, /feitos-multiplos, /buscar-por-mascara, /buscar-por-variacoes
 │   └── ui.py         # GET / — interface web com gate de autenticação
 └── captcha/
     ├── model.py       # Arquitetura CRNN (CNN + BiLSTM + CTC Loss)
@@ -84,10 +84,10 @@ app/
 | GET | `/` | — | Interface web |
 | POST | `/cpf/validate` | — | Valida um CPF |
 | POST | `/cpf/variations` | — | Gera variações válidas |
-| POST | `/trt3/feitos` | 10/min por IP | Consulta feitos de um CPF |
-| POST | `/trt3/feitos-multiplos` | 5/min por IP | Consulta lista de CPFs em paralelo |
-| POST | `/trt3/buscar-por-mascara` | 3/min por IP | Consulta CPFs por máscara com curingas |
-| POST | `/trt3/buscar-por-variacoes` | 3/min por IP | Consulta variações de CPF parcial |
+| POST | `/consulta/feitos` | 10/min por IP | Consulta feitos de um CPF |
+| POST | `/consulta/feitos-multiplos` | 5/min por IP | Consulta lista de CPFs em paralelo |
+| POST | `/consulta/buscar-por-mascara` | 3/min por IP | Consulta CPFs por máscara com curingas |
+| POST | `/consulta/buscar-por-variacoes` | 3/min por IP | Consulta variações de CPF parcial |
 | GET | `/auth/check` | — | Valida o token (401 se inválido) — usado pelo gate da UI |
 | GET | `/health` | — | Health check (sempre aberto — healthcheck do Docker) |
 | GET | `/metrics` | — | Métricas Prometheus (token em `production`) |

@@ -77,7 +77,9 @@ class BuscarMascaraRequest(BaseModel):
     workers: int = Field(default=_cfg.DEFAULT_WORKERS, ge=1, le=_cfg.MAX_WORKERS, description=f"Threads paralelas para consulta ao TRT3 (1–{_cfg.MAX_WORKERS})")
 
 
-router = APIRouter(prefix="/trt3", tags=["trt3"])
+# Sem prefixo aqui: main.py monta em /consulta. Os caminhos não citam a fonte,
+# que é escolhida por SOURCE no .env.
+router = APIRouter()
 
 
 @router.post(

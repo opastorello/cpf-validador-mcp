@@ -7,7 +7,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from prometheus_fastapi_instrumentator import Instrumentator
 from app import metrics as _m
-from app.routers import cpf, trt3, ui
+from app.routers import consulta, cpf, ui
 from app.mcp_server import mcp
 from app.auth import TokenMiddleware
 from app.services import sources
@@ -109,7 +109,7 @@ async def auth_check():
 
 app.include_router(ui.router)
 app.include_router(cpf.router)
-app.include_router(trt3.router)
+app.include_router(consulta.router, prefix="/consulta", tags=["consulta"])
 
 Instrumentator().instrument(app).expose(app, include_in_schema=False)
 
