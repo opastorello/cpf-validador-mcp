@@ -192,3 +192,31 @@ def test_buscar_por_mascara_caractere_invalido(client):
     r = client.post("/trt3/buscar-por-mascara", json={"mascara": "151.879.82A-95"})
     assert r.status_code == 422
     assert "Caractere inválido" in r.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
+# POST /trt3/feitos-multiplos — semântica de total
+# ---------------------------------------------------------------------------
+
+def test_multiplos_total_conta_recebidos_e_consultados(client):
+    """`total` mudava de significado: contava os válidos quando havia algum e
+    todos os recebidos quando não havia nenhum."""
+    def _fake(cpfs, nome=None, workers=None, **kw):
+        return {"total": len(cpfs), "matches": {}, "resultados": {}}
+
+    with patch("app.routers.trt3.consultar_multiplos", side_effect=_fake):
+        r = client.post("/trt3/feitos-multiplos",
+                        json={"cpfs": ["151.879.820-95", "111.111.111-11"]})
+
+    d = r.json()
+    assert d["total"] == 2              # recebidos
+    assert d["total_consultados"] == 1  # só o válido foi consultado
+    assert len(d["erros"]) == 1
+
+
+def test_multiplos_sem_nenhum_cpf_valido(client):
+    r = client.post("/trt3/feitos-multiplos", json={"cpfs": ["111.111.111-11", "abc"]})
+    d = r.json()
+    assert d["total"] == 2
+    assert d["total_consultados"] == 0
+    assert len(d["erros"]) == 2

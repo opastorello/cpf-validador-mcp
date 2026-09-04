@@ -28,6 +28,7 @@ _EXAMPLE_FEITO = {
 
 _EXAMPLE_MULTIPLOS = {
     "total": 2,
+    "total_consultados": 2,
     "matches": {"15187982095": _EXAMPLE_FEITO},
     "resultados": {
         "15187982095": _EXAMPLE_FEITO,
@@ -113,6 +114,7 @@ async def feitos(request: Request, body: CpfRequest):
     description=(
         "Recebe uma lista de CPFs e consulta o TRT3 em paralelo usando múltiplas threads. "
         "CPFs inválidos são separados no campo `erros` sem interromper os demais. "
+        "`total` conta os CPFs recebidos e `total_consultados`, os que foram de fato consultados. "
         "O campo `matches` retorna apenas os CPFs encontrados."
     ),
     responses={200: {"content": {"application/json": {"example": _EXAMPLE_MULTIPLOS}}}},
@@ -135,11 +137,18 @@ async def feitos_multiplos(request: Request, body: FeitosMultiplosRequest):
         _m.cpf_bulk_invalid_total.inc(len(erros))
 
     if not cpfs_validos:
-        return {"total": len(body.cpfs), "erros": erros, "resultados": {}, "matches": {}}
+        return {"total": len(body.cpfs), "total_consultados": 0, "erros": erros,
+                "resultados": {}, "matches": {}}
 
     _m.cpf_bulk_queries_total.inc()
     _m.cpf_bulk_size.observe(len(cpfs_validos))
     resultado = await run_in_threadpool(consultar_multiplos, cpfs_validos, None, body.workers)
+    # "total" é sempre quantos CPFs vieram na requisição; os inválidos entram em
+    # "erros" e não são consultados, então o que foi de fato consultado é
+    # "total_consultados". Antes "total" significava uma coisa quando havia
+    # algum CPF válido e outra quando não havia nenhum.
+    resultado["total_consultados"] = resultado["total"]
+    resultado["total"] = len(body.cpfs)
     resultado["erros"] = erros
     matches = len(resultado.get("matches", {}))
     if matches:

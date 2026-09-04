@@ -148,6 +148,7 @@ async def find_cpf_by_variations(cpf_parcial: str, nome: str | None = None, work
 async def check_multiple_cpfs(cpfs: list[str], workers: int = 8) -> dict:
     """Valida e confirma titularidade de uma lista de CPFs em paralelo consultando o TRT3.
     CPFs inválidos são agrupados no campo 'erros' sem interromper os demais.
+    'total' conta os CPFs recebidos; 'total_consultados', os que foram consultados.
 
     Args:
         cpfs: lista de CPFs (aceita com ou sem formatação)
@@ -171,11 +172,15 @@ async def check_multiple_cpfs(cpfs: list[str], workers: int = 8) -> dict:
 
     if not cpfs_validos:
         _m.trt3_mcp_calls_total.labels(tool="check_multiple_cpfs", result="invalid").inc()
-        return {"total": len(cpfs), "erros": erros, "resultados": {}, "matches": {}}
+        return {"total": len(cpfs), "total_consultados": 0, "erros": erros,
+                "resultados": {}, "matches": {}}
 
     _m.cpf_bulk_queries_total.inc()
     _m.cpf_bulk_size.observe(len(cpfs_validos))
     resultado = await run_in_threadpool(consultar_multiplos, cpfs_validos, None, workers)
+    # "total" = recebidos, "total_consultados" = os válidos que foram consultados
+    resultado["total_consultados"] = resultado["total"]
+    resultado["total"] = len(cpfs)
     resultado["erros"] = erros
     matches = len(resultado.get("matches", {}))
     _m.trt3_mcp_calls_total.labels(tool="check_multiple_cpfs", result="success" if matches else "not_found").inc()
