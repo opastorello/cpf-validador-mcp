@@ -110,16 +110,16 @@ POSITIVA = (FIXTURES / "certidao_positiva.txt").read_text(encoding="utf-8")
 def test_certidao_negativa():
     d = _parse_texto_certidao(NEGATIVA)
     assert d["tipo_certidao"] == "NEGATIVA"
-    assert d["tem_feitos"] is False
+    assert d["tem_registro"] is False
     assert d["nome_certidao"] == "FULANO DE TAL"
     assert d["valida_ate"] == "03/10/2026"
     assert d["numero_certidao"] == "1195030/2026"
 
 
-def test_certidao_positiva_marca_tem_feitos():
+def test_certidao_positiva_marca_tem_registro():
     d = _parse_texto_certidao(POSITIVA)
     assert d["tipo_certidao"] == "POSITIVA"
-    assert d["tem_feitos"] is True
+    assert d["tem_registro"] is True
 
 
 def test_numero_da_certidao_pula_o_codigo_de_autenticidade():
@@ -130,7 +130,7 @@ def test_numero_da_certidao_pula_o_codigo_de_autenticidade():
 
 
 def test_texto_vazio_nao_quebra():
-    assert _parse_texto_certidao("") == {"tem_feitos": False}
+    assert _parse_texto_certidao("") == {"tem_registro": False}
 
 
 def test_cpf_da_certidao_e_extraido():

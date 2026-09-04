@@ -55,8 +55,8 @@ TASK_TIMEOUT            = _float("TASK_TIMEOUT", 60.0)
 MAX_WILDCARDS_IN_MASK   = _int("MAX_WILDCARDS_IN_MASK", 5)
 
 # ── Rate limits (formato slowapi: "N/minute" ou "N/second") ──
-RATE_LIMIT_FEITOS       = _str("RATE_LIMIT_FEITOS", "10/minute")
-RATE_LIMIT_MULTIPLOS    = _str("RATE_LIMIT_MULTIPLOS", "5/minute")
+RATE_LIMIT_CPF       = _str("RATE_LIMIT_CPF", "10/minute")
+RATE_LIMIT_CPFS    = _str("RATE_LIMIT_CPFS", "5/minute")
 RATE_LIMIT_MASK         = _str("RATE_LIMIT_MASK", "3/minute")
 RATE_LIMIT_VARIACOES    = _str("RATE_LIMIT_VARIACOES", "3/minute")
 

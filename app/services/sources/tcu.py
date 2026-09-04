@@ -100,7 +100,7 @@ def _parse_resposta(cpf_fmt: str, status: int, corpo: dict) -> dict:
             "encontrado": True,
             "nome_certidao": dados.get("nome"),
             "tipo_certidao": dados.get("modeloCertidao"),
-            "tem_feitos": negativa is False,
+            "tem_registro": negativa is False,
             "cpf_certidao": dados.get("cpfCnpj"),
             "valida_ate": dados.get("dataValidade"),
             "numero_certidao": dados.get("codigoControle"),

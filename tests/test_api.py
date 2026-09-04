@@ -79,28 +79,28 @@ def test_cpf_variations(client):
 
 
 # ---------------------------------------------------------------------------
-# POST /consulta/feitos
+# POST /consulta/cpf
 # ---------------------------------------------------------------------------
 
-def test_trt3_feitos_cpf_invalido(client):
-    r = client.post("/consulta/feitos", json={"cpf": "111.111.111-11"})
+def test_consulta_cpf_cpf_invalido(client):
+    r = client.post("/consulta/cpf", json={"cpf": "111.111.111-11"})
     assert r.status_code == 422
 
 
-def test_trt3_feitos_cpf_curto(client):
-    r = client.post("/consulta/feitos", json={"cpf": "123"})
+def test_consulta_cpf_cpf_curto(client):
+    r = client.post("/consulta/cpf", json={"cpf": "123"})
     assert r.status_code == 422
 
 
-def test_trt3_feitos_sucesso(client):
+def test_consulta_cpf_sucesso(client):
     with patch("app.routers.consulta.consultar", return_value=MOCK_FEITOS):
-        r = client.post("/consulta/feitos", json={"cpf": "151.879.820-95"})
+        r = client.post("/consulta/cpf", json={"cpf": "151.879.820-95"})
     assert r.status_code == 200
     assert r.json()["cpf"] == "15187982095"
 
 
-def test_trt3_feitos_payload_invalido(client):
-    r = client.post("/consulta/feitos", json={})
+def test_consulta_cpf_payload_invalido(client):
+    r = client.post("/consulta/cpf", json={})
     assert r.status_code == 422
 
 
@@ -195,7 +195,7 @@ def test_buscar_por_mascara_caractere_invalido(client):
 
 
 # ---------------------------------------------------------------------------
-# POST /consulta/feitos-multiplos — semântica de total
+# POST /consulta/cpfs — semântica de total
 # ---------------------------------------------------------------------------
 
 def test_multiplos_total_conta_recebidos_e_consultados(client):
@@ -205,7 +205,7 @@ def test_multiplos_total_conta_recebidos_e_consultados(client):
         return {"total": len(cpfs), "matches": {}, "resultados": {}}
 
     with patch("app.routers.consulta.consultar_multiplos", side_effect=_fake):
-        r = client.post("/consulta/feitos-multiplos",
+        r = client.post("/consulta/cpfs",
                         json={"cpfs": ["151.879.820-95", "111.111.111-11"]})
 
     d = r.json()
@@ -215,7 +215,7 @@ def test_multiplos_total_conta_recebidos_e_consultados(client):
 
 
 def test_multiplos_sem_nenhum_cpf_valido(client):
-    r = client.post("/consulta/feitos-multiplos", json={"cpfs": ["111.111.111-11", "abc"]})
+    r = client.post("/consulta/cpfs", json={"cpfs": ["111.111.111-11", "abc"]})
     d = r.json()
     assert d["total"] == 2
     assert d["total_consultados"] == 0

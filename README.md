@@ -26,7 +26,7 @@ Para confirmar a titularidade de um CPF, o sistema consulta o **TRT3** — que e
 | ---- | --------- |
 | `validate_cpf` | Valida matematicamente um CPF pelo algoritmo módulo-11 |
 | `generate_valid_variations` | Gera todas as variações válidas de um CPF com dígitos errados ou ilegíveis |
-| `check_feitos_trabalhistas` | Confirma titularidade de um CPF consultando o TRT3 |
+| `check_cpf` | Confirma titularidade de um CPF consultando o TRT3 |
 | `find_cpf_by_mask` | Descobre o CPF completo a partir de uma máscara com `*` nos dígitos desconhecidos |
 | `find_cpf_by_variations` | Dado um CPF parcial ou errado, encontra o correto filtrando pelo nome |
 | `check_multiple_cpfs` | Valida e confirma titularidade de uma lista de CPFs em paralelo |
@@ -40,8 +40,8 @@ Para confirmar a titularidade de um CPF, o sistema consulta o **TRT3** — que e
 | `GET`  | `/` | — | Interface web |
 | `POST` | `/cpf/validate` | — | Valida um CPF matematicamente |
 | `POST` | `/cpf/variations` | — | Gera variações válidas de um CPF |
-| `POST` | `/consulta/feitos` | 10/min por IP | Confirma titularidade de um CPF na fonte ativa |
-| `POST` | `/consulta/feitos-multiplos` | 5/min por IP | Confirma lista de CPFs em paralelo |
+| `POST` | `/consulta/cpf` | 10/min por IP | Confirma a titularidade de um CPF na fonte ativa |
+| `POST` | `/consulta/cpfs` | 5/min por IP | Confirma lista de CPFs em paralelo |
 | `POST` | `/consulta/buscar-por-mascara` | 3/min por IP | Descobre CPF por máscara com curingas |
 | `POST` | `/consulta/buscar-por-variacoes` | 3/min por IP | Descobre CPF correto a partir de variações |
 | `GET`  | `/auth/check` | — | Valida o token — `401` se ausente/incorreto, `200` se válido |
@@ -78,7 +78,7 @@ app/
 │       └── exemplo.py    # Modelo para novas fontes (fictícia, sem rede)
 ├── routers/
 │   ├── cpf.py          # POST /cpf/validate, POST /cpf/variations
-│   ├── consulta.py     # POST /consulta/feitos, /feitos-multiplos, /buscar-por-mascara, /buscar-por-variacoes
+│   ├── consulta.py     # POST /consulta/cpf, /cpfs, /buscar-por-mascara, /buscar-por-variacoes
 │   └── ui.py           # GET / — interface web
 └── captcha/
     ├── model.py        # Arquitetura CRNN (CNN + BiLSTM + CTC Loss)
@@ -189,8 +189,8 @@ Todas as opções são lidas de variáveis de ambiente ou do arquivo `.env` na r
 | `MAX_WORKERS` | `20` | Limite máximo de `workers` que o cliente pode solicitar |
 | `TASK_TIMEOUT` | `60` | Timeout (segundos) por CPF individual em consultas paralelas |
 | `MAX_WILDCARDS_IN_MASK` | `5` | Máximo de curingas na parte base da máscara (evita explosão combinatória) |
-| `RATE_LIMIT_FEITOS` | `10/minute` | Rate limit de `/consulta/feitos` por IP |
-| `RATE_LIMIT_MULTIPLOS` | `5/minute` | Rate limit de `/consulta/feitos-multiplos` por IP |
+| `RATE_LIMIT_CPF` | `10/minute` | Rate limit de `/consulta/cpf` por IP |
+| `RATE_LIMIT_CPFS` | `5/minute` | Rate limit de `/consulta/cpfs` por IP |
 | `RATE_LIMIT_MASK` | `3/minute` | Rate limit de `/consulta/buscar-por-mascara` por IP |
 | `RATE_LIMIT_VARIACOES` | `3/minute` | Rate limit de `/consulta/buscar-por-variacoes` por IP |
 | `CAPTCHA_MODEL_PATH` | *(vazio — usa `app/captcha/captcha_model.pt`)* | Path absoluto para o modelo `.pt` (útil para montar modelo externo) |
@@ -225,7 +225,7 @@ Authorization: Bearer meu-token-secreto
 **REST:**
 
 ```bash
-curl -X POST http://localhost:8000/consulta/feitos \
+curl -X POST http://localhost:8000/consulta/cpf \
   -H "Authorization: Bearer meu-token-secreto" \
   -H "Content-Type: application/json" \
   -d '{"cpf": "151.879.820-95"}'
@@ -290,7 +290,7 @@ curl -X POST http://localhost:8000/cpf/validate \
 ### Confirmar titularidade
 
 ```bash
-curl -X POST http://localhost:8000/consulta/feitos \
+curl -X POST http://localhost:8000/consulta/cpf \
   -H "Content-Type: application/json" \
   -d '{"cpf": "151.879.820-95"}'
 ```
@@ -352,7 +352,7 @@ curl -X POST http://localhost:8000/consulta/buscar-por-variacoes \
 ### Consulta em lote
 
 ```bash
-curl -X POST http://localhost:8000/consulta/feitos-multiplos \
+curl -X POST http://localhost:8000/consulta/cpfs \
   -H "Content-Type: application/json" \
   -d '{"cpfs": ["151.879.820-95", "151.879.821-76"], "workers": 4}'
 ```

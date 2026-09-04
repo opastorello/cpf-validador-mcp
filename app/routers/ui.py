@@ -805,7 +805,7 @@ _HTML = r"""<!DOCTYPE html>
           const recalcCpf = variations[0]?.cpf_numeros;
           let found = false;
           if (recalcCpf) {
-            const fastRes  = await post('/consulta/feitos', {cpf: recalcCpf});
+            const fastRes  = await post('/consulta/cpf', {cpf: recalcCpf});
             const fastData = await fastRes.json();
             if (fastRes.ok && fastData.nome_certidao) {
               const bate = !nome || nomeMatch(fastData.nome_certidao, nome);
@@ -921,7 +921,7 @@ _HTML = r"""<!DOCTYPE html>
           interrompido = !!finalData.interrompido;
           resultados = liveMatches;
         } else {
-          const res  = await post('/consulta/feitos', {cpf});
+          const res  = await post('/consulta/cpf', {cpf});
           const data = await res.json();
           if (!res.ok) throw new Error(data.detail || 'Erro na consulta');
           doneStep(s4, txtResolvido);

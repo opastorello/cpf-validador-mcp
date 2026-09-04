@@ -20,8 +20,8 @@ consulta_duration_seconds = Histogram(
     buckets=[2, 5, 10, 20, 30, 60, 120, 300],
 )
 
-consulta_feitos_total = Counter(
-    "consulta_feitos_total",
+consulta_cpf_total = Counter(
+    "consulta_cpf_total",
     "Consultas ao endpoint de CPF único, por fonte e resultado",
     ["fonte", "result"],  # found | not_found | error
 )
@@ -140,12 +140,12 @@ cpf_variation_candidates_total = Counter(
 
 cpf_bulk_queries_total = Counter(
     "cpf_bulk_queries_total",
-    "Chamadas ao endpoint /consulta/feitos-multiplos",
+    "Chamadas ao endpoint /consulta/cpfs",
 )
 
 cpf_bulk_size = Histogram(
     "cpf_bulk_size",
-    "Quantidade de CPFs por chamada ao /consulta/feitos-multiplos",
+    "Quantidade de CPFs por chamada ao /consulta/cpfs",
     buckets=[1, 2, 5, 10, 20, 50, 100],
 )
 
@@ -168,7 +168,7 @@ mcp_calls_total = Counter(
     "mcp_calls_total",
     "Chamadas recebidas via MCP por ferramenta e resultado",
     ["tool", "result"],
-    # tool: validate_cpf|generate_valid_variations|check_feitos_trabalhistas|
+    # tool: validate_cpf|generate_valid_variations|check_cpf|
     #       find_cpf_by_mask|find_cpf_by_variations|check_multiple_cpfs
     # result: success|not_found|invalid|error
 )

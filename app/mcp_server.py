@@ -32,24 +32,24 @@ def generate_valid_variations(cpf: str) -> dict:
 
 
 @mcp.tool
-async def check_feitos_trabalhistas(cpf: str) -> dict:
-    """Consulta feitos trabalhistas no TRT 3ª Região (certidao.trt3.jus.br).
-    Valida o CPF, resolve captcha automaticamente e retorna o resultado da certidão."""
+async def check_cpf(cpf: str) -> dict:
+    """Consulta um CPF na fonte configurada (SOURCE) e devolve a certidão.
+    Valida o CPF, resolve o captcha da fonte automaticamente e retorna o resultado."""
     cpf_limpo = re.sub(r"\D", "", cpf)
     if len(cpf_limpo) != 11:
-        _m.mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="invalid").inc()
+        _m.mcp_calls_total.labels(tool="check_cpf", result="invalid").inc()
         return {"erro": f"CPF deve ter 11 dígitos, recebido {len(cpf_limpo)}"}
     if not is_valido(cpf_limpo):
-        _m.mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="invalid").inc()
+        _m.mcp_calls_total.labels(tool="check_cpf", result="invalid").inc()
         return {"erro": "CPF matematicamente inválido", "cpf": formatar(cpf_limpo)}
     result = await run_in_threadpool(consultar_fonte, cpf_limpo)
     if result.get("encontrado"):
-        _m.mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="found").inc()
-        _m.consulta_matches_total.labels(fonte=_cfg.SOURCE, type="mcp_feitos").inc()
+        _m.mcp_calls_total.labels(tool="check_cpf", result="found").inc()
+        _m.consulta_matches_total.labels(fonte=_cfg.SOURCE, type="mcp_cpf").inc()
     elif result.get("erro"):
-        _m.mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="error").inc()
+        _m.mcp_calls_total.labels(tool="check_cpf", result="error").inc()
     else:
-        _m.mcp_calls_total.labels(tool="check_feitos_trabalhistas", result="not_found").inc()
+        _m.mcp_calls_total.labels(tool="check_cpf", result="not_found").inc()
     return result
 
 

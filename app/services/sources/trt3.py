@@ -91,7 +91,7 @@ def _parse_texto_certidao(text: str) -> dict:
     if tipo_match:
         result["tipo_certidao"] = tipo_match.group(1).upper()
 
-    result["tem_feitos"] = result.get("tipo_certidao", "NEGATIVA") == "POSITIVA"
+    result["tem_registro"] = result.get("tipo_certidao", "NEGATIVA") == "POSITIVA"
 
     nome_match = re.search(r"contra\s+([A-Z][^,]+),\s*inscrito", text)
     if nome_match:

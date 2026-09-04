@@ -41,7 +41,7 @@ def test_metricas_do_projeto_estao_registradas(client):
         # da consulta — valem para qualquer fonte e levam o label `fonte`
         "consulta_queries_total",
         "consulta_duration_seconds",
-        "consulta_feitos_total",
+        "consulta_cpf_total",
         "consulta_matches_total",
         # do scraping do TRT3 — não existem para uma fonte sem CAPTCHA
         "trt3_captcha_attempts_total",

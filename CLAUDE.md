@@ -49,7 +49,7 @@ app/
 │       └── exemplo.py  # Modelo para novas fontes — fictícia, sem rede e sem CAPTCHA
 ├── routers/
 │   ├── cpf.py        # POST /cpf/validate, POST /cpf/variations
-│   ├── consulta.py   # POST /consulta/feitos, /feitos-multiplos, /buscar-por-mascara, /buscar-por-variacoes
+│   ├── consulta.py   # POST /consulta/cpf, /cpfs, /buscar-por-mascara, /buscar-por-variacoes
 │   └── ui.py         # GET / — interface web com gate de autenticação
 └── captcha/
     ├── model.py       # Arquitetura CRNN (CNN + BiLSTM + CTC Loss)
@@ -74,7 +74,7 @@ app/
 |------|-----------|
 | `validate_cpf` | Validação matemática via algoritmo módulo-11 |
 | `generate_valid_variations` | Gera variações válidas: recalcula dígitos, troca 1 dígito, transpõe pares adjacentes |
-| `check_feitos_trabalhistas` | Consulta TRT3 — valida CPF, resolve CAPTCHA (CRNN), retorna resultado estruturado |
+| `check_cpf` | Consulta TRT3 — valida CPF, resolve CAPTCHA (CRNN), retorna resultado estruturado |
 | `find_cpf_by_mask` | Descobre CPF completo a partir de máscara com curingas — consulta TRT3 em paralelo |
 | `find_cpf_by_variations` | Gera candidatos de CPF parcial/errado e consulta TRT3 em paralelo, filtra por nome |
 | `check_multiple_cpfs` | Consulta lista de CPFs em paralelo, agrupa erros de validação separadamente |
@@ -85,8 +85,8 @@ app/
 | GET | `/` | — | Interface web |
 | POST | `/cpf/validate` | — | Valida um CPF |
 | POST | `/cpf/variations` | — | Gera variações válidas |
-| POST | `/consulta/feitos` | 10/min por IP | Consulta feitos de um CPF |
-| POST | `/consulta/feitos-multiplos` | 5/min por IP | Consulta lista de CPFs em paralelo |
+| POST | `/consulta/cpf` | 10/min por IP | Consulta um CPF na fonte ativa |
+| POST | `/consulta/cpfs` | 5/min por IP | Consulta lista de CPFs em paralelo |
 | POST | `/consulta/buscar-por-mascara` | 3/min por IP | Consulta CPFs por máscara com curingas |
 | POST | `/consulta/buscar-por-variacoes` | 3/min por IP | Consulta variações de CPF parcial |
 | GET | `/auth/check` | — | Valida o token (401 se inválido) — usado pelo gate da UI |
@@ -143,7 +143,7 @@ uma linha em `_REGISTRO`. Nenhum router ou tool MCP precisa mudar.
 ### Métricas
 Dois grupos, separados pelo que é conceito de consulta e o que é do scraping:
 - `consulta_*` — valem para qualquer fonte e levam o label `fonte`
-  (`consulta_queries_total`, `consulta_duration_seconds`, `consulta_feitos_total`,
+  (`consulta_queries_total`, `consulta_duration_seconds`, `consulta_cpf_total`,
   `consulta_matches_total`). São incrementadas num ponto só, em
   `sources/__init__.py::_consultar_medindo`, para toda fonte ser medida igual
 - `trt3_*` — CAPTCHA de imagem, PDF, resets de sessão e erros HTTP

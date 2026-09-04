@@ -112,17 +112,17 @@ def test_certidao_negativa():
     assert r["encontrado"] is True
     assert r["nome_certidao"] == "FULANO DE TAL"
     assert r["tipo_certidao"] == "NEGATIVA"
-    assert r["tem_feitos"] is False
+    assert r["tem_registro"] is False
     assert r["valida_ate"] == "03/10/2026"
     assert r["numero_certidao"] == "VBKE20260903235404"
 
 
-def test_certidao_positiva_marca_tem_feitos():
+def test_certidao_positiva_marca_tem_registro():
     corpo = {"dadosCertidao": {**SUCESSO["dadosCertidao"],
                                "modeloCertidao": "POSITIVA",
                                "seCertidaoNegativa": False}}
     r = _parse_resposta(CPF_FMT, 200, corpo)
-    assert r["tem_feitos"] is True
+    assert r["tem_registro"] is True
 
 
 def test_cpf_nao_localizado_nao_e_erro():
