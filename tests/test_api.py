@@ -121,6 +121,8 @@ def test_auth_com_api_token(monkeypatch):
     """Com API_TOKEN definido — exige Bearer token correto."""
     import app.auth as _auth
     monkeypatch.setattr(_auth, "_TOKEN", "test-secret")
+    # simula ENV=production: só "/" e "/health" abertos
+    monkeypatch.setattr(_auth, "_OPEN_PATHS", {"/", "/health"})
 
     from app.auth import TokenMiddleware
     from app.routers import cpf
@@ -133,9 +135,22 @@ def test_auth_com_api_token(monkeypatch):
     async def health():
         return {"status": "ok"}
 
+    @test_app.get("/auth/check")
+    async def auth_check():
+        return {"ok": True}
+
     with TestClient(test_app) as c:
         # health sempre público
         assert c.get("/health").status_code == 200
+
+        # /auth/check é protegido — é ele que o gate da UI usa para validar o
+        # token. Se cair numa rota aberta (ex.: /health), qualquer token passa.
+        assert c.get("/auth/check").status_code == 401
+        assert c.get("/auth/check", headers={"Authorization": "Bearer errado"}).status_code == 401
+        assert c.get("/auth/check", headers={"Authorization": "Bearer test-secret"}).status_code == 200
+
+        # /metrics exige token fora de development (METRICS_PUBLIC=false)
+        assert c.get("/metrics").status_code == 401
 
         # sem token → 401
         r = c.post("/cpf/validate", json={"cpf": "111.444.777-35"})

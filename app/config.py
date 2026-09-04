@@ -18,6 +18,9 @@ def _float(key: str, default: float) -> float:
 def _str(key: str, default: str) -> str:
     return os.getenv(key, default).strip()
 
+def _bool(key: str, default: bool) -> bool:
+    return os.getenv(key, str(default)).strip().lower() in ("1", "true", "yes", "on")
+
 # ── Ambiente ────────────────────────────────────────────────
 ENV                     = _str("ENV", "development")
 IS_PRODUCTION           = ENV == "production"
@@ -47,9 +50,10 @@ RATE_LIMIT_MULTIPLOS    = _str("RATE_LIMIT_MULTIPLOS", "5/minute")
 RATE_LIMIT_MASK         = _str("RATE_LIMIT_MASK", "3/minute")
 RATE_LIMIT_VARIACOES    = _str("RATE_LIMIT_VARIACOES", "3/minute")
 
+# ── Observabilidade ──────────────────────────────────────────
+# /metrics é público em development; em production exige token salvo se true
+METRICS_PUBLIC          = _bool("METRICS_PUBLIC", False)
+
 # ── Captcha model ────────────────────────────────────────────
 CAPTCHA_MODEL_PATH      = _str("CAPTCHA_MODEL_PATH", "")   # vazio = path padrão relativo
 
-# ── Histórico ────────────────────────────────────────────────
-HISTORY_RETENTION_DAYS  = _int("HISTORY_RETENTION_DAYS", 90)
-APP_TIMEZONE            = _str("APP_TIMEZONE", "America/Sao_Paulo")

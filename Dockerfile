@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ ./app/
 
-RUN useradd -m mcpuser && mkdir -p /app/app/data && chown mcpuser /app/app/data
+RUN useradd -m mcpuser
 USER mcpuser
 
 EXPOSE 8000

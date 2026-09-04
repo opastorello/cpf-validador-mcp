@@ -1,22 +1,25 @@
 import hmac
-import os
 
-from dotenv import load_dotenv
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-load_dotenv()
+from app import config as _cfg
 
-_TOKEN = os.getenv("API_TOKEN", "").strip()
-_ENV = os.getenv("ENV", "development").strip().lower()
+_TOKEN = _cfg.API_TOKEN
+_ENV = _cfg.ENV.lower()
 
-# "/" e "/health" são sempre acessíveis sem token (qualquer ambiente)
-# Em desenvolvimento, /docs, /redoc, /openapi.json também ficam abertos
-_OPEN_PATHS_ALWAYS = {"/", "/health", "/metrics"}
-_OPEN_PATHS_DEV = {"/docs", "/redoc", "/openapi.json"}
+# "/" e "/health" ficam sempre abertos: "/" carrega o gate da UI e "/health" é
+# consumido pelo healthcheck do Docker, que não tem como enviar o token.
+# Em desenvolvimento /docs, /redoc, /openapi.json e /metrics também ficam abertos.
+# /metrics expõe contadores de negócio (volume de consultas, acerto do CAPTCHA):
+# em produção só abre com METRICS_PUBLIC=true.
+_OPEN_PATHS_ALWAYS = {"/", "/health"}
+_OPEN_PATHS_DEV = {"/docs", "/redoc", "/openapi.json", "/metrics"}
 
 _OPEN_PATHS = _OPEN_PATHS_ALWAYS | (_OPEN_PATHS_DEV if _ENV == "development" else set())
+if _cfg.METRICS_PUBLIC:
+    _OPEN_PATHS = _OPEN_PATHS | {"/metrics"}
 
 
 class TokenMiddleware(BaseHTTPMiddleware):

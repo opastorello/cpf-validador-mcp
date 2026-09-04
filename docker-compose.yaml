@@ -21,10 +21,7 @@ services:
       - RATE_LIMIT_MASK=${RATE_LIMIT_MASK:-3/minute}
       - RATE_LIMIT_VARIACOES=${RATE_LIMIT_VARIACOES:-3/minute}
       - CAPTCHA_MODEL_PATH=${CAPTCHA_MODEL_PATH:-}
-      - HISTORY_RETENTION_DAYS=${HISTORY_RETENTION_DAYS:-90}
-      - APP_TIMEZONE=${APP_TIMEZONE:-America/Sao_Paulo}
-    volumes:
-      - cpf_data:/app/app/data
+      - METRICS_PUBLIC=${METRICS_PUBLIC:-false}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -32,6 +29,3 @@ services:
       retries: 3
       start_period: 60s
     restart: always
-
-volumes:
-  cpf_data:

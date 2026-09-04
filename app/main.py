@@ -5,7 +5,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from prometheus_fastapi_instrumentator import Instrumentator
 from app import metrics as _m
-from app.routers import cpf, trt3, ui, history
+from app.routers import cpf, trt3, ui
 from app.mcp_server import mcp
 from app.auth import TokenMiddleware
 
@@ -63,14 +63,31 @@ app.add_middleware(TokenMiddleware)
     "/health",
     tags=["health"],
     summary="Health check",
-    description="Verifica se o servidor está no ar. Em `ENV=production` exige token.",
+    description="Verifica se o servidor está no ar. Sempre aberto — é consumido pelo healthcheck do Docker.",
     responses={200: {"content": {"application/json": {"example": {"status": "ok"}}}}},
 )
 async def health():
     return {"status": "ok"}
 
+
+@app.get(
+    "/auth/check",
+    tags=["auth"],
+    summary="Valida o token de acesso",
+    description=(
+        "Rota protegida usada pela interface web para validar o token informado no gate. "
+        "Retorna 401 quando o token está ausente ou incorreto, e 200 quando é válido "
+        "(ou quando `API_TOKEN` não está configurado)."
+    ),
+    responses={
+        200: {"content": {"application/json": {"example": {"ok": True}}}},
+        401: {"content": {"application/json": {"example": {"detail": "Unauthorized"}}}},
+    },
+)
+async def auth_check():
+    return {"ok": True}
+
 app.include_router(ui.router)
-app.include_router(history.router)
 app.include_router(cpf.router)
 app.include_router(trt3.router)
 

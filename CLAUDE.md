@@ -16,7 +16,15 @@ docker compose up --build -d
 docker compose down
 ```
 
-Não há testes automatizados. Testes manuais via:
+Testes automatizados (mockam o TRT3, rodam no CI):
+
+```bash
+pip install -r requirements-dev.txt
+ruff check app/
+pytest tests/ -v
+```
+
+Testes manuais via:
 - Interface web: `http://localhost:8000/`
 - FastAPI docs (apenas `ENV=development`): `http://localhost:8000/docs`
 - MCP transport: `http://localhost:8000/mcp` (streamable-http)
@@ -37,7 +45,6 @@ app/
 ├── routers/
 │   ├── cpf.py        # POST /cpf/validate, POST /cpf/variations
 │   ├── trt3.py       # POST /trt3/feitos, /feitos-multiplos, /buscar-por-mascara, /buscar-por-variacoes
-│   ├── history.py    # GET/POST/DELETE /history/ — histórico server-side em JSON
 │   └── ui.py         # GET / — interface web com gate de autenticação
 └── captcha/
     ├── model.py       # Arquitetura CRNN (CNN + BiLSTM + CTC Loss)
@@ -75,17 +82,18 @@ app/
 | POST | `/trt3/feitos-multiplos` | 5/min por IP | Consulta lista de CPFs em paralelo |
 | POST | `/trt3/buscar-por-mascara` | 3/min por IP | Consulta CPFs por máscara com `*` |
 | POST | `/trt3/buscar-por-variacoes` | 3/min por IP | Consulta variações de CPF parcial |
-| GET | `/history/` | — | Lista histórico de consultas |
-| POST | `/history/save` | — | Salva entrada no histórico |
-| DELETE | `/history/` | — | Limpa todo o histórico |
-| GET | `/health` | — | Health check (aberto em `development`) |
+| GET | `/auth/check` | — | Valida o token (401 se inválido) — usado pelo gate da UI |
+| GET | `/health` | — | Health check (sempre aberto — healthcheck do Docker) |
+| GET | `/metrics` | — | Métricas Prometheus (token em `production`) |
 
 ### Autenticação
 - `API_TOKEN` vazio → servidor sem autenticação
-- `API_TOKEN` definido → todas as rotas exigem `Authorization: Bearer <token>`, exceto `/`
-- `ENV=development` → `/health`, `/docs`, `/redoc`, `/openapi.json` também ficam abertos
-- `ENV=production` → apenas `/` fica aberto sem token
-- Interface web (`/`) tem gate: exige token no browser quando `API_TOKEN` está configurado
+- `API_TOKEN` definido → todas as rotas exigem `Authorization: Bearer <token>`, exceto `/` e `/health`
+- `ENV=development` → `/docs`, `/redoc`, `/openapi.json`, `/metrics` também ficam abertos
+- `ENV=production` → apenas `/` e `/health` ficam abertos sem token (`/health` é o healthcheck do Docker)
+- `METRICS_PUBLIC=true` → abre `/metrics` sem token também em `production`
+- Interface web (`/`) tem gate: exige token no browser quando `API_TOKEN` está configurado. O gate valida contra `/auth/check` — **nunca** contra uma rota aberta como `/health`, senão qualquer token passa
+- O histórico da UI vive no `localStorage` do navegador; o servidor não persiste consultas
 
 ### Fluxo de scraping TRT3
 1. GET página do formulário → extrai JSF `ViewState` e URL do CAPTCHA

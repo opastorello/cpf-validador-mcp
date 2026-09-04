@@ -44,22 +44,17 @@ Para confirmar a titularidade de um CPF, o sistema consulta o **TRT3** — que e
 | `POST` | `/trt3/feitos-multiplos` | 5/min por IP | Confirma lista de CPFs em paralelo |
 | `POST` | `/trt3/buscar-por-mascara` | 3/min por IP | Descobre CPF por máscara com `*` |
 | `POST` | `/trt3/buscar-por-variacoes` | 3/min por IP | Descobre CPF correto a partir de variações |
-| `GET`  | `/history/` | — | Lista o histórico de consultas realizadas |
-| `POST` | `/history/save` | — | Salva ou atualiza uma entrada no histórico |
-| `DELETE` | `/history/` | — | Limpa todo o histórico |
-| `DELETE` | `/history/{cpf}` | — | Remove a entrada de um CPF específico |
+| `GET`  | `/auth/check` | — | Valida o token — `401` se ausente/incorreto, `200` se válido |
 | `GET`  | `/health` | — | Health check — retorna `{"status": "ok"}` |
 
 Documentação interativa: `http://localhost:8000/docs` (disponível apenas em `ENV=development`).
 
 ### 📂 Histórico de consultas
 
-O histórico é **global e compartilhado** — todas as consultas feitas pela interface web, pela REST API ou via MCP gravam no mesmo arquivo de histórico do servidor.
+O histórico é **local ao navegador** — fica no `localStorage` da interface web e nunca sai do cliente. O servidor não persiste CPFs consultados.
 
-- **Interface web:** o usuário pode ativar ou desativar o salvamento automático individualmente, através do toggle na aba Histórico. A preferência é salva no `localStorage` do navegador e não afeta outras interfaces.
-- **REST API / MCP:** toda consulta bem-sucedida é registrada no histórico global, independente do token utilizado.
-
-> **Roadmap:** no futuro está prevista a opção de múltiplos históricos isolados por token — permitindo que cada integração (web, API, MCP) mantenha seu próprio registro separado.
+- **Interface web:** o toggle na aba Histórico ativa ou desativa o salvamento automático; a preferência também é salva no `localStorage`.
+- **REST API / MCP:** não gravam histórico — cada cliente registra o que quiser do seu lado.
 
 ---
 
@@ -79,7 +74,6 @@ app/
 ├── routers/
 │   ├── cpf.py          # POST /cpf/validate, POST /cpf/variations
 │   ├── trt3.py         # POST /trt3/feitos, /feitos-multiplos, /buscar-por-mascara, /buscar-por-variacoes
-│   ├── history.py      # GET/POST/DELETE /history/ — histórico de consultas
 │   └── ui.py           # GET / — interface web
 └── captcha/
     ├── model.py        # Arquitetura CRNN (CNN + BiLSTM + CTC Loss)
@@ -123,8 +117,7 @@ Todas as opções são lidas de variáveis de ambiente ou do arquivo `.env` na r
 | `RATE_LIMIT_MASK` | `3/minute` | Rate limit de `/trt3/buscar-por-mascara` por IP |
 | `RATE_LIMIT_VARIACOES` | `3/minute` | Rate limit de `/trt3/buscar-por-variacoes` por IP |
 | `CAPTCHA_MODEL_PATH` | *(vazio — usa `app/captcha/captcha_model.pt`)* | Path absoluto para o modelo `.pt` (útil para montar modelo externo) |
-| `HISTORY_RETENTION_DAYS` | `90` | Dias de retenção do histórico (LGPD). `0` = sem limite |
-| `APP_TIMEZONE` | `America/Sao_Paulo` | Timezone para timestamps do histórico |
+| `METRICS_PUBLIC` | `false` | `true` abre `/metrics` sem token também em `production` |
 
 ### 🔒 Rotas abertas por ambiente
 
@@ -135,6 +128,7 @@ Todas as opções são lidas de variáveis de ambiente ou do arquivo `.env` na r
 | `/docs` | ✅ aberta | 🔒 token |
 | `/redoc` | ✅ aberta | 🔒 token |
 | `/openapi.json` | ✅ aberta | 🔒 token |
+| `/metrics` | ✅ aberta | 🔒 token *(ou `METRICS_PUBLIC=true`)* |
 | `/mcp` | 🔒 token | 🔒 token |
 | demais | 🔒 token | 🔒 token |
 
@@ -354,7 +348,6 @@ Ideias e melhorias planejadas para versões futuras.
 - **Cache de resultados** — CPFs já consultados recentemente retornam resultado armazenado sem nova requisição ao TRT3. Reduz latência e carga no tribunal.
 
 ### Multi-usuário
-- **Histórico isolado por token** — cada integração (web, API, MCP) mantém seu próprio registro separado em vez do histórico global compartilhado atual.
 - **Quota de consultas por token** — cada token teria um limite mensal/diário de consultas configurável independentemente do rate limit por IP. Ex: token A = 1.000 consultas/dia, token B = 10.000/dia.
 - **Workers por token** — cada token teria um número máximo de workers simultâneos ao TRT3. Ex: token gratuito = 2 workers, token premium = 20 workers. Garante que um único cliente não monopoliza a capacidade do servidor enquanto outros aguardam.
 

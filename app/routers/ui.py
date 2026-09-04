@@ -994,9 +994,14 @@ _HTML = r"""<!DOCTYPE html>
       btn.disabled = true;
       btn.textContent = 'Validando…';
       try {
-        const res = await fetch('/health', { headers: { 'Authorization': 'Bearer ' + tok } });
+        const res = await fetch('/auth/check', { headers: { 'Authorization': 'Bearer ' + tok } });
         if (res.status === 401) {
           showGateMsg('✕ Token inválido.', 'var(--err-text)');
+          btn.disabled = false; btn.textContent = 'Entrar';
+          return;
+        }
+        if (!res.ok) {
+          showGateMsg('⚠ Erro ao validar (HTTP ' + res.status + ').', 'var(--err-text)');
           btn.disabled = false; btn.textContent = 'Entrar';
           return;
         }
