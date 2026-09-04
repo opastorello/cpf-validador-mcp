@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 from app.auth import _TOKEN
+from app.services.sources import get_fonte
 
 router = APIRouter(include_in_schema=False)
 
@@ -631,6 +632,15 @@ _HTML = r"""<!DOCTYPE html>
 
     const delay = ms => new Promise(r => setTimeout(r, ms));
     const AUTH_REQUIRED = __AUTH_REQUIRED__;
+    const USA_CAPTCHA   = __USA_CAPTCHA__;
+
+    // Uma fonte sem CAPTCHA não pode anunciar que resolveu um. Os rótulos dos
+    // passos seguem a capacidade declarada pela fonte ativa.
+    const txtResolvendo = USA_CAPTCHA ? 'Resolvendo CAPTCHA…' : 'Consultando a fonte…';
+    const txtResolvido  = USA_CAPTCHA ? 'CAPTCHA resolvido'   : 'Consulta concluída';
+    const txtResolvidos = n => USA_CAPTCHA
+      ? `${n} CAPTCHA${n!=1?'s':''} resolvido${n!=1?'s':''}`
+      : `${n} consulta${n!=1?'s':''} concluída${n!=1?'s':''}`;
     const getToken = () => localStorage.getItem('api_token') || '';
     const authH = () => { const t = getToken(); return t ? {'Authorization': 'Bearer ' + t} : {}; };
 
@@ -785,7 +795,7 @@ _HTML = r"""<!DOCTYPE html>
           ? 'Testando CPF recalculado…'
           : hasMask
           ? 'Aguardando contagem de candidatos…'
-          : 'Resolvendo CAPTCHA…');
+          : txtResolvendo);
 
         if (useVariations) {
           /* caminho rápido: testa só o CPF com dígitos recalculados (variações[0]) */
@@ -797,7 +807,7 @@ _HTML = r"""<!DOCTYPE html>
             if (fastRes.ok && fastData.nome_certidao) {
               const bate = !nome || nomeMatch(fastData.nome_certidao, nome);
               if (bate) {
-                doneStep(s4, 'CPF recalculado confirmado — 1 CAPTCHA');
+                doneStep(s4, `CPF recalculado confirmado — ${txtResolvidos(1)}`);
                 resultados = [fastData];
                 found = true;
               }
@@ -841,7 +851,7 @@ _HTML = r"""<!DOCTYPE html>
               }
             }
             if (!vfinal) throw new Error('Stream de variações encerrado sem resultado');
-            doneStep(s4, `${totalCandidatos} CAPTCHA${totalCandidatos!==1?'s':''} resolvido${totalCandidatos!==1?'s':''}`);
+            doneStep(s4, txtResolvidos(totalCandidatos));
             inexistentes = contaInexistentes(vfinal);
             resultados = liveMatches;
           }
@@ -880,11 +890,11 @@ _HTML = r"""<!DOCTYPE html>
                 s2.querySelector('span:last-child').textContent =
                   `${evt.total} combinaç${evt.total!=1?'ões':'ão'} calculada${evt.total!=1?'s':''}`;
                 s4.querySelector('span:last-child').textContent = evt.total === 1
-                  ? 'Resolvendo CAPTCHA…'
+                  ? txtResolvendo
                   : `Testando em paralelo… 0/${evt.total}`;
               } else if (evt.progress !== undefined) {
                 s4.querySelector('span:last-child').textContent = evt.total === 1
-                  ? 'Resolvendo CAPTCHA…'
+                  ? txtResolvendo
                   : `Testando em paralelo… ${evt.progress}/${evt.total}`;
               } else if (evt.match) {
                 liveMatches.push(evt.match); renderLive();
@@ -900,14 +910,14 @@ _HTML = r"""<!DOCTYPE html>
           if (!finalData) throw new Error('Stream encerrado sem resultado');
           totalCandidatos = finalData.candidatos_gerados || '?';
           s2.querySelector('span:last-child').textContent = `${totalCandidatos} combinaç${totalCandidatos!=1?'ões':'ão'} calculada${totalCandidatos!=1?'s':''}`;
-          doneStep(s4, `${totalCandidatos} CAPTCHA${totalCandidatos!=1?'s':''} resolvido${totalCandidatos!=1?'s':''}`);
+          doneStep(s4, txtResolvidos(totalCandidatos));
           inexistentes = contaInexistentes(finalData);
           resultados = liveMatches;
         } else {
           const res  = await post('/consulta/feitos', {cpf});
           const data = await res.json();
           if (!res.ok) throw new Error(data.detail || 'Erro na consulta');
-          doneStep(s4, 'CAPTCHA resolvido');
+          doneStep(s4, txtResolvido);
           inexistente = !!data.cpf_inexistente;
           msgInexistente = data.mensagem || '';
           if (data.nome_certidao) resultados = [data];
@@ -1185,4 +1195,8 @@ _HTML = r"""<!DOCTYPE html>
 @router.get("/", response_class=HTMLResponse)
 async def ui():
     auth_required = "true" if _TOKEN else "false"
-    return _HTML.replace("__AUTH_REQUIRED__", auth_required)
+    # A fonte ativa é importada aqui na primeira carga da página; seria
+    # importada de todo jeito na primeira consulta.
+    usa_captcha = "true" if get_fonte().usa_captcha else "false"
+    return (_HTML.replace("__AUTH_REQUIRED__", auth_required)
+                 .replace("__USA_CAPTCHA__", usa_captcha))

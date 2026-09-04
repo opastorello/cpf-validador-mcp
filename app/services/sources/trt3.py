@@ -292,6 +292,7 @@ class TRT3(Fonte):
 
     nome = "trt3"
     rotulo = "TRT 3ª Região (certidao.trt3.jus.br)"
+    usa_captcha = True
 
     def consultar(self, cpf_limpo: str) -> dict:
         return _consultar_trt3_interno(cpf_limpo)

@@ -34,6 +34,7 @@ class Exemplo(Fonte):
 
     nome = "exemplo"
     rotulo = "Fonte de exemplo (dados fictícios, não consulta nada)"
+    usa_captcha = False   # herdaria False do contrato; explícito por ser o modelo
 
     def consultar(self, cpf_limpo: str) -> dict:
         cpf_fmt = formatar(cpf_limpo)

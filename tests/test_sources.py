@@ -114,3 +114,21 @@ def test_source_invalido_derruba_o_boot():
     assert r.returncode != 0
     assert "SOURCE='tribunal-que-nao-existe' não existe" in r.stderr
     assert "trt3" in r.stderr
+
+
+def test_fonte_declara_se_usa_captcha():
+    """A interface não pode adivinhar: quem sabe é a fonte."""
+    assert get_fonte("trt3").usa_captcha is True
+    assert get_fonte("exemplo").usa_captcha is False
+
+
+def test_capacidade_de_captcha_tem_padrao_no_contrato():
+    """Uma fonte nova que não declare nada não anuncia CAPTCHA por engano."""
+    class FonteMinima(Fonte):
+        nome = "minima"
+        rotulo = "Fonte mínima"
+
+        def consultar(self, cpf_limpo: str) -> dict:
+            return {"cpf": cpf_limpo, "encontrado": False}
+
+    assert FonteMinima().usa_captcha is False

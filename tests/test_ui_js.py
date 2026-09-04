@@ -84,3 +84,25 @@ def test_separadores_digitados_nao_duplicam():
     assert _rodar_no_node(["151.879.820-95", "151 879 820 95"]) == [
         "151.879.820-95", "151.879.820-95",
     ]
+
+
+# ── rótulos que dependem da fonte ──────────────────────────────────────────
+
+def test_html_injeta_a_capacidade_de_captcha(monkeypatch):
+    """A página serve true/false conforme a fonte ativa; os rótulos dos passos
+    são escolhidos a partir disso."""
+    import asyncio
+
+    import app.routers.ui as ui_mod
+    from app.services.sources import get_fonte
+
+    def _com(fonte):
+        monkeypatch.setattr(ui_mod, "get_fonte", lambda *a, **k: get_fonte(fonte))
+        return asyncio.run(ui_mod.ui())
+
+    html_trt3 = _com("trt3")
+    assert "const USA_CAPTCHA   = true;" in html_trt3
+
+    html_exemplo = _com("exemplo")
+    assert "const USA_CAPTCHA   = false;" in html_exemplo
+    assert "__USA_CAPTCHA__" not in html_exemplo   # placeholder foi substituído

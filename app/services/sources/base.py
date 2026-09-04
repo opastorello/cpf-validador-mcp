@@ -35,6 +35,10 @@ class Fonte(ABC):
     #: descrição legível — ex.: "TRT 3ª Região (certidao.trt3.jus.br)"
     rotulo: str = ""
 
+    #: A fonte resolve CAPTCHA para consultar? A interface usa isto para não
+    #: anunciar "CAPTCHA resolvido" numa fonte que não tem CAPTCHA nenhum.
+    usa_captcha: bool = False
+
     @abstractmethod
     def consultar(self, cpf_limpo: str) -> dict:
         """Consulta um CPF (11 dígitos, sem formatação) e devolve o resultado.
